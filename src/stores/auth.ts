@@ -1,11 +1,19 @@
 import { defineStore } from 'pinia';
 import { api } from '../api/axios';
 
+export interface UserProfile {
+  user_id: string;
+  login: string;
+  family_id: string;
+  family_name?: string;
+  created_at?: string;
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     accessToken: localStorage.getItem('access_token') || null,
     refreshToken: localStorage.getItem('refresh_token') || null,
-    user: null as any
+    user: null as UserProfile | null,
   }),
   
   getters: {
@@ -25,6 +33,16 @@ export const useAuthStore = defineStore('auth', {
       this.setTokens(data.access_token, data.refresh_token);
       await this.fetchMe();
     },
+
+    async register(login: string, password: string, familyName?: string) {
+      const payload: { login: string; password: string; family_name?: string } = { login, password };
+      if (familyName && familyName.trim().length > 0) {
+        payload.family_name = familyName.trim();
+      }
+      const { data } = await api.post('/auth/register', payload);
+      this.setTokens(data.access_token, data.refresh_token);
+      await this.fetchMe();
+    },
     
     async fetchMe() {
       if (!this.accessToken) return;
@@ -34,6 +52,19 @@ export const useAuthStore = defineStore('auth', {
       } catch (err) {
         this.clearAuth();
       }
+    },
+
+    async updateProfile(payload: { login?: string; family_name?: string }) {
+      const { data } = await api.put('/me', payload);
+      this.user = data;
+      return data;
+    },
+
+    async changePassword(currentPassword: string, newPassword: string) {
+      await api.put('/auth/password', {
+        current_password: currentPassword,
+        new_password: newPassword,
+      });
     },
     
     async logout() {

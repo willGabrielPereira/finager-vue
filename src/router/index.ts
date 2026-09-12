@@ -8,11 +8,15 @@ const router = createRouter({
     { path: '/register', component: () => import('../views/RegisterView.vue'), meta: { public: true } },
     { path: '/', component: () => import('../views/DashboardView.vue') },
     { path: '/transactions', component: () => import('../views/TransactionsView.vue') },
-    // More routes mapped later
+    { path: '/import', component: () => import('../views/ImportView.vue') },
+    { path: '/tags', component: () => import('../views/TagsView.vue') },
+    { path: '/profile', component: () => import('../views/ProfileView.vue') },
+    { path: '/tag-rules', component: () => import('../views/TagRulesView.vue') },
+    { path: '/:pathMatch(.*)*', redirect: '/' }
   ]
 });
 
-router.beforeEach(async (to, from, next) => {
+router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
   
   if (!to.meta.public && !authStore.isAuthenticated) {
