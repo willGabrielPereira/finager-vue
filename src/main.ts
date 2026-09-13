@@ -1,6 +1,8 @@
+import '@vueform/multiselect/themes/default.css';
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import './style.css';
+import './assets/multiselect.css';
 import App from './App.vue';
 import router from './router';
 

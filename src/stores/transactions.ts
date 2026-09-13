@@ -1,33 +1,152 @@
-import { defineStore } from 'pinia';
+﻿import { defineStore } from 'pinia';
 import { api } from '../api/axios';
+
+export interface Transaction {
+  id: string;
+  fitid: string;
+  type: 'DEBIT' | 'CREDIT';
+  date_posted: string;
+  amount: number;
+  name: string;
+  memo: string;
+  tags: string[];
+  account_id: string;
+  family_id: string;
+  created_by: string;
+  imported_at: string;
+  manually_tagged: boolean;
+  status: 'POSTED' | 'PLANNED' | 'PENDING_RECONCILIATION' | 'RECONCILED';
+  is_transfer: boolean;
+  destination_account_id?: string;
+  source: 'OFX' | 'MANUAL' | 'RECEIPT';
+}
 
 export const useTransactionsStore = defineStore('transactions', {
   state: () => ({
-    transactions: [] as any[],
+    transactions: [] as Transaction[],
     pagination: {
       page: 1,
       limit: 20,
       total: 0,
-      totalPages: 0
+      totalPages: 0,
     },
-    loading: false
+    filters: {
+      search: '',
+      status: '',
+      type: '',
+      tag: '',
+      accounts: [] as string[],
+      tags: [] as string[],
+      date_from: '',
+      date_to: '',
+    },
+    loading: false,
   }),
-  
+
   actions: {
     async fetchTransactions(params: Record<string, any> = {}) {
       this.loading = true;
       try {
-        const { data } = await api.get('/transactions', { params: { page: this.pagination.page, limit: this.pagination.limit, ...params } });
+        const queryParams: Record<string, any> = {
+          page: params.page ?? this.pagination.page,
+          limit: params.limit ?? this.pagination.limit,
+          search: params.search !== undefined ? params.search : this.filters.search,
+          status: params.status !== undefined ? params.status : this.filters.status,
+          type: params.type !== undefined ? params.type : this.filters.type,
+          date_from: params.date_from !== undefined ? params.date_from : this.filters.date_from,
+          date_to: params.date_to !== undefined ? params.date_to : this.filters.date_to,
+        };
+
+        const accounts = params.accounts !== undefined ? params.accounts : this.filters.accounts;
+        if (Array.isArray(accounts) && accounts.length > 0) {
+          queryParams.accounts = accounts.join(',');
+        } else if (typeof accounts === 'string' && accounts.trim()) {
+          queryParams.accounts = accounts.trim();
+        }
+
+        const tags = params.tags !== undefined ? params.tags : this.filters.tags;
+        if (Array.isArray(tags) && tags.length > 0) {
+          queryParams.tags = tags.join(',');
+        } else if (params.tag || this.filters.tag) {
+          queryParams.tag = params.tag || this.filters.tag;
+        }
+
+        const cleaned: Record<string, any> = {};
+        for (const [k, v] of Object.entries(queryParams)) {
+          if (v !== '' && v !== null && v !== undefined) {
+            cleaned[k] = v;
+          }
+        }
+
+        const { data } = await api.get('/transactions', { params: cleaned });
         this.transactions = data.data || [];
         this.pagination = {
           page: data.page,
           limit: data.limit,
           total: data.total,
-          totalPages: data.total_pages
+          totalPages: data.total_pages,
         };
       } finally {
         this.loading = false;
       }
-    }
-  }
+    },
+
+    clearFilters() {
+      this.filters.search = '';
+      this.filters.status = '';
+      this.filters.type = '';
+      this.filters.tag = '';
+      this.filters.accounts = [];
+      this.filters.tags = [];
+      this.filters.date_from = '';
+      this.filters.date_to = '';
+      this.pagination.page = 1;
+    },
+
+    async updateTags(txId: string, tagIds: string[]) {
+      const tx = this.transactions.find((t) => t.id === txId);
+      const originalTags = tx ? [...(tx.tags || [])] : [];
+
+      if (tx) {
+        tx.tags = tagIds;
+        tx.manually_tagged = true;
+      }
+
+      try {
+        await api.put('/transactions/' + txId, { tags: tagIds });
+      } catch (err) {
+        if (tx) tx.tags = originalTags;
+        throw err;
+      }
+    },
+
+    async createTransaction(payload: any) {
+      const { data } = await api.post('/transactions', payload);
+      this.transactions.unshift(data);
+      this.pagination.total++;
+      return data;
+    },
+
+    async deleteTransaction(txId: string) {
+      await api.delete('/transactions/' + txId);
+      this.transactions = this.transactions.filter((t) => t.id !== txId);
+      this.pagination.total--;
+    },
+
+    async applySimilar(txId: string, includeManuallyTagged = false) {
+      const { data } = await api.post('/transactions/' + txId + '/apply-similar', {
+        include_manually_tagged: includeManuallyTagged,
+      });
+      await this.fetchTransactions();
+      return data;
+    },
+
+    async runAIAutoTag(includeManuallyTagged = false) {
+      const { data } = await api.post('/transactions/ai-auto-tag', {
+        include_manually_tagged: includeManuallyTagged,
+      });
+      await this.fetchTransactions();
+      return data;
+    },
+  },
 });

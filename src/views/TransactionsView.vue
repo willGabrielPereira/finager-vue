@@ -1,105 +1,950 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
-import { useTransactionsStore } from '../stores/transactions';
-import { PhArrowDownRight, PhArrowUpRight, PhCalendarBlank } from '@phosphor-icons/vue';
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
+import { useTransactionsStore } from '../stores/transactions'
+import AppSelect from '../components/ui/AppSelect.vue'
+import { useTagsStore } from '../stores/tags'
+import { useAccountsStore } from '../stores/accounts'
+import CategoryCombobox from '../components/ui/CategoryCombobox.vue'
+import SimilarTagPrompt from '../components/ui/SimilarTagPrompt.vue'
+import AIReclassifyModal from '../components/ui/AIReclassifyModal.vue'
+import CreateTransactionModal from '../components/ui/CreateTransactionModal.vue'
+import ImportOFXModal from '../components/ui/ImportOFXModal.vue'
+import { 
+  PhArrowDownRight, 
+  PhArrowUpRight, 
+  PhCalendarBlank, 
+  PhCaretDown, 
+  PhPlus, 
+  PhCircleNotch, 
+  PhSparkle, 
+  PhUploadSimple, 
+  PhTrash, 
+  PhMagnifyingGlass, 
+  PhBank, 
+  PhCreditCard, 
+  PhX, 
+  PhCheck, 
+  PhArrowsCounterClockwise 
+} from '@phosphor-icons/vue'
 
-const store = useTransactionsStore();
+const store = useTransactionsStore()
+const tagsStore = useTagsStore()
+const accountsStore = useAccountsStore()
 
-onMounted(() => {
+// Estado do Seletor de Categoria Inline
+const activeDropdownTxId = ref<string | null>(null)
+const updatingTxId = ref<string | null>(null)
+const dropdownPosition = ref({ left: '0px', top: '0px' })
+
+// Modais e Prompts
+const isAIModalOpen = ref(false)
+const isAIModalLoading = ref(false)
+const aiResultCount = ref<number | null>(null)
+
+const isCreateModalOpen = ref(false)
+const isImportModalOpen = ref(false)
+
+// Prompt de Propagação de Tags Semelhantes
+const similarPrompt = ref<{
+  txId: string
+  merchantPattern: string
+  categoryName: string
+  categoryColor: string
+  loading: boolean
+} | null>(null)
+
+// Filtros
+const searchInput = ref('')
+const activeFilterTab = ref<'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED'>('ALL')
+
+// Dropdowns de Filtro Avançado
+const isAccountsMenuOpen = ref(false)
+const isTagsMenuOpen = ref(false)
+const isPeriodMenuOpen = ref(false)
+const tagSearchQuery = ref('')
+
+type PeriodPreset = 'ALL' | 'PREVIOUS_MONTH' | 'CURRENT_MONTH' | 'LAST_30' | 'CURRENT_YEAR' | 'CUSTOM'
+const activePeriodPreset = ref<PeriodPreset>('ALL')
+const customDateFrom = ref('')
+const customDateTo = ref('')
+
+const periodLabels: Record<PeriodPreset, string> = {
+  ALL: 'Todo o histórico',
+  PREVIOUS_MONTH: 'Mês anterior',
+  CURRENT_MONTH: 'Mês atual',
+  LAST_30: 'Últimos 30 dias',
+  CURRENT_YEAR: 'Este ano',
+  CUSTOM: 'Personalizado',
+}
+
+onMounted(async () => {
+  await Promise.all([
+    store.fetchTransactions(),
+    tagsStore.fetchTags(),
+    tagsStore.fetchFrequentTags(60, 6),
+    accountsStore.fetchAccounts()
+  ])
+  window.addEventListener('click', onWindowClick)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('click', onWindowClick)
+})
+
+const onWindowClick = () => {
+  closeCategoryDropdown()
+  isAccountsMenuOpen.value = false
+  isTagsMenuOpen.value = false
+  isPeriodMenuOpen.value = false
+}
+
+// Busca com debounce
+let searchTimeout: any = null
+watch(searchInput, (newVal) => {
+  clearTimeout(searchTimeout)
+  searchTimeout = setTimeout(() => {
+    store.filters.search = newVal
+    store.pagination.page = 1
+    store.fetchTransactions()
+  }, 350)
+})
+
+const setFilterTab = (tab: 'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED') => {
+  activeFilterTab.value = tab
+  store.pagination.page = 1
+
+  if (tab === 'ALL') {
+    store.filters.type = ''
+    store.filters.status = ''
+  } else if (tab === 'DEBIT') {
+    store.filters.type = 'DEBIT'
+    store.filters.status = ''
+  } else if (tab === 'CREDIT') {
+    store.filters.type = 'CREDIT'
+    store.filters.status = ''
+  } else if (tab === 'UNTAGGED') {
+    store.filters.type = ''
+    store.filters.status = 'UNTAGGED'
+  } else if (tab === 'PLANNED') {
+    store.filters.type = ''
+    store.filters.status = 'PLANNED'
+  }
+
+  store.fetchTransactions()
+}
+
+// Filtro Multi-Contas
+const toggleAccountFilter = (accId: string) => {
+  const current = [...store.filters.accounts]
+  const idx = current.indexOf(accId)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(accId)
+  }
+  store.filters.accounts = current
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+
+const accountFilterOptions = computed(() => {
+  return accountsStore.accounts.map((a) => ({
+    value: a.id,
+    label: a.name,
+    badge: a.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
+    icon: a.type === 'CREDIT_CARD' ? PhCreditCard : PhBank,
+  }))
+})
+
+
+
+const toggleTagFilter = (tagId: string) => {
+  store.filters.tags = store.filters.tags.filter(id => id !== tagId);
+  store.pagination.page = 1;
   store.fetchTransactions();
-});
+};
+
+const tagFilterOptions = computed(() => {
+  return tagsStore.tags.map((t) => ({
+    value: t.id,
+    label: t.name,
+    color: t.color,
+  }))
+})
+
+// Filtro de Período
+const setPeriodPreset = (preset: PeriodPreset) => {
+  activePeriodPreset.value = preset
+  const now = new Date()
+
+  if (preset === 'ALL') {
+    store.filters.date_from = ''
+    store.filters.date_to = ''
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CURRENT_MONTH') {
+    const y = now.getFullYear()
+    const m = now.getMonth()
+    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'PREVIOUS_MONTH') {
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const y = prevDate.getFullYear()
+    const m = prevDate.getMonth()
+    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'LAST_30') {
+    const d30 = new Date()
+    d30.setDate(now.getDate() - 30)
+    store.filters.date_from = d30.toISOString().split('T')[0]
+    store.filters.date_to = now.toISOString().split('T')[0]
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CURRENT_YEAR') {
+    const y = now.getFullYear()
+    store.filters.date_from = `${y}-01-01`
+    store.filters.date_to = `${y}-12-31`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CUSTOM') {
+    return
+  }
+
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+const applyCustomDates = () => {
+  store.filters.date_from = customDateFrom.value
+  store.filters.date_to = customDateTo.value
+  isPeriodMenuOpen.value = false
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+// Reset de Todos os Filtros
+const hasActiveFilters = computed(() => {
+  return (
+    searchInput.value !== '' ||
+    activeFilterTab.value !== 'ALL' ||
+    store.filters.accounts.length > 0 ||
+    store.filters.tags.length > 0 ||
+    activePeriodPreset.value !== 'ALL' ||
+    Boolean(store.filters.date_from) ||
+    Boolean(store.filters.date_to)
+  )
+})
+
+const resetAllFilters = () => {
+  store.clearFilters()
+  activeFilterTab.value = 'ALL'
+  searchInput.value = ''
+  activePeriodPreset.value = 'ALL'
+  customDateFrom.value = ''
+  customDateTo.value = ''
+  tagSearchQuery.value = ''
+  store.fetchTransactions()
+}
+
+const getTagById = (id: string) => {
+  return tagsStore.tags.find((t) => t.id === id)
+}
+
+const getAccountById = (id: string) => {
+  return accountsStore.accounts.find((a) => a.id === id)
+}
+
+const toggleCategoryDropdown = (txId: string, event: Event) => {
+  event.stopPropagation()
+  if (activeDropdownTxId.value === txId) {
+    activeDropdownTxId.value = null
+  } else {
+    activeDropdownTxId.value = txId
+    isAccountsMenuOpen.value = false
+    isTagsMenuOpen.value = false
+    isPeriodMenuOpen.value = false
+
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
+    const scrollTop = window.scrollY || document.documentElement.scrollTop
+    const scrollLeft = window.scrollX || document.documentElement.scrollLeft
+
+    const dropdownHeight = 320
+    const windowHeight = window.innerHeight
+    const opensUpward = rect.bottom + dropdownHeight > windowHeight && rect.top - dropdownHeight > 0
+
+    dropdownPosition.value = {
+      left: Math.min(rect.left + scrollLeft, window.innerWidth - 340) + 'px',
+      top: (opensUpward 
+        ? (rect.top + scrollTop - dropdownHeight - 6) 
+        : (rect.bottom + scrollTop + 6)) + 'px',
+    }
+  }
+}
+
+const closeCategoryDropdown = () => {
+  activeDropdownTxId.value = null
+}
+
+const onCategorySelected = async (txId: string, tagId: string | null) => {
+  closeCategoryDropdown()
+  updatingTxId.value = txId
+
+  const tx = store.transactions.find((t) => t.id === txId)
+  if (!tx) return
+
+  const originalTags = [...(tx.tags || [])]
+  const newTags = tagId ? [tagId, ...originalTags.slice(1)] : []
+
+  try {
+    await store.updateTags(txId, newTags)
+
+    if (tagId) {
+      const tagObj = getTagById(tagId)
+      similarPrompt.value = {
+        txId: tx.id,
+        merchantPattern: tx.name || tx.memo,
+        categoryName: tagObj?.name || 'Categoria',
+        categoryColor: tagObj?.color || '#22c55e',
+        loading: false,
+      }
+    }
+  } catch (err) {
+    console.error('Erro ao atualizar categoria:', err)
+  } finally {
+    updatingTxId.value = null
+  }
+}
+
+const onSecondaryTagToggled = async (txId: string, tagId: string) => {
+  const tx = store.transactions.find((t) => t.id === txId)
+  if (!tx) return
+
+  const currentTags = [...(tx.tags || [])]
+  const exists = currentTags.includes(tagId)
+  const newTags = exists ? currentTags.filter((id) => id !== tagId) : [...currentTags, tagId]
+
+  try {
+    await store.updateTags(txId, newTags)
+  } catch (err) {
+    console.error('Erro ao atualizar marcadores secundários:', err)
+  }
+}
+
+const handleApplySimilar = async () => {
+  if (!similarPrompt.value) return
+
+  similarPrompt.value.loading = true
+  try {
+    const res = await store.applySimilar(similarPrompt.value.txId, false)
+    similarPrompt.value = null
+    alert('Sucesso! A categoria foi aplicada a ' + (res?.updated_count ?? 0) + ' transações semelhantes.')
+  } catch (err: any) {
+    console.error('Falha ao propagar tags:', err)
+    alert(err.response?.data?.message || 'Falha ao propagar tags.')
+  } finally {
+    if (similarPrompt.value) similarPrompt.value.loading = false
+  }
+}
+
+const handleConfirmAI = async (includeManuallyTagged: boolean) => {
+  isAIModalLoading.value = true
+  try {
+    const res = await store.runAIAutoTag(includeManuallyTagged)
+    aiResultCount.value = res.tagged_count
+  } catch (err: any) {
+    console.error('Erro na IA:', err)
+    alert(err.response?.data?.message || 'Falha ao rodar classificação com IA.')
+  } finally {
+    isAIModalLoading.value = false
+  }
+}
+
+const closeAIModal = () => {
+  isAIModalOpen.value = false
+  aiResultCount.value = null
+}
+
+const handleDelete = async (txId: string) => {
+  if (!confirm('Deseja realmente excluir este lançamento?')) return
+  try {
+    await store.deleteTransaction(txId)
+  } catch (err) {
+    console.error('Falha ao deletar:', err)
+    alert('Erro ao excluir transação.')
+  }
+}
 
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString();
-};
+  if (!dateString) return ''
+  const d = new Date(dateString)
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
 const formatCurrency = (val: number) => {
-  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
-};
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+}
 </script>
 
 <template>
-  <div class="flex flex-col gap-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl font-bold">Transactions</h1>
-      <router-link to="/import" class="bg-accent text-bg px-4 py-2 font-semibold rounded-lg hover:opacity-90 hover:-translate-y-px transition-all">
-        Import OFX
-      </router-link>
+  <div class="flex flex-col gap-5">
+    <!-- Barra Superior: Título e Botões de Ação -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Extrato & Transações</h1>
+        <p class="text-xs text-white/50">Gerencie seus lançamentos bancários, manuais e faturas</p>
+      </div>
+
+      <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
+        <button 
+          @click="isAIModalOpen = true"
+          class="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-accent/50 active:scale-95 shrink-0"
+        >
+          <PhSparkle :size="15" weight="fill" />
+          <span>Classificar com IA</span>
+        </button>
+
+        <button 
+          @click="isImportModalOpen = true" 
+          class="inline-flex items-center gap-1.5 border border-white/10 bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-white/20 active:scale-95 shrink-0"
+        >
+          <PhUploadSimple :size="15" />
+          <span>Importar OFX</span>
+        </button>
+
+        <button 
+          @click="isCreateModalOpen = true" 
+          class="inline-flex items-center gap-1.5 bg-accent hover:bg-accent/90 text-bg px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shadow-md shadow-accent/20 active:scale-95 shrink-0"
+        >
+          <PhPlus :size="15" weight="bold" />
+          <span>Novo Lançamento</span>
+        </button>
+      </div>
     </div>
 
-    <div class="bg-surface rounded-xl border border-white/5 overflow-hidden shadow-lg">
-      <div v-if="store.loading" class="p-8 text-center text-white/50">
-        Carregando transações...
-      </div>
-      
-      <table v-else class="w-full text-left border-collapse">
-        <thead>
-          <tr class="bg-white/5 text-sm font-medium text-white/70">
-            <th class="p-4 border-b border-white/5 min-w-[300px]">NAME/MEMO</th>
-            <th class="p-4 border-b border-white/5 w-[150px]">DATE</th>
-            <th class="p-4 border-b border-white/5 w-[150px]">TAGS</th>
-            <th class="p-4 border-b border-white/5 text-right w-[150px]">AMOUNT</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-if="store.transactions.length === 0">
-            <td colspan="4" class="p-8 text-center text-white/50">Nenhuma transação encontrada.</td>
-          </tr>
-          
-          <tr v-for="t in store.transactions" :key="t.id" class="border-b border-white/5 hover:bg-white/5 transition-colors">
-            <td class="p-4">
-              <div class="flex items-center gap-3">
-                <div class="flex-shrink-0 w-10 h-10 rounded-full bg-white/5 flex items-center justify-center">
-                  <PhArrowUpRight v-if="t.type === 'CREDIT'" class="text-accent" :size="20" />
-                  <PhArrowDownRight v-else class="text-red-400" :size="20" />
-                </div>
-                <div>
-                  <div class="font-medium truncate max-w-xs" :title="t.name">{{ t.name }}</div>
-                  <div class="text-xs text-white/50 truncate max-w-xs" :title="t.memo">{{ t.memo || 'Sem descrição' }}</div>
-                </div>
-              </div>
-            </td>
-            <td class="p-4 text-white/70 whitespace-nowrap">
-              <div class="flex items-center gap-2 text-sm">
-                <PhCalendarBlank :size="16" />
-                {{ formatDate(t.date_posted) }}
-              </div>
-            </td>
-            <td class="p-4">
-              <div class="flex flex-wrap gap-2">
-                <span v-for="tag in (t.tags || [])" :key="tag" class="px-2 py-0.5 rounded text-xs bg-white/10 text-white/80">
-                  Tag {{ tag }}
-                </span>
-                <span v-if="!t.tags || t.tags.length === 0" class="text-xs text-white/30 italic">No tags</span>
-              </div>
-            </td>
-            <td class="p-4 text-right font-medium whitespace-nowrap" :class="t.type === 'CREDIT' ? 'text-accent' : ''">
-              {{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}
-            </td>
-          </tr>
-        </tbody>
-      </table>
-      
-      <!-- Pagination -->
-      <div v-if="store.pagination.totalPages > 1" class="p-4 border-t border-white/5 flex items-center justify-between">
-        <span class="text-sm text-white/50">Página {{ store.pagination.page }} de {{ store.pagination.totalPages }}</span>
-        <div class="flex gap-2">
-          <button 
-            :disabled="store.pagination.page === 1"
-            @click="store.fetchTransactions({ page: store.pagination.page - 1 })"
-            class="px-3 py-1 bg-surface-2 rounded border border-white/10 hover:bg-white/10 disabled:opacity-50 transition-colors cursor-pointer"
+    <!-- Bloco de Filtros Principal -->
+    <div class="bg-surface rounded-2xl border border-white/5 p-3.5 flex flex-col gap-3 shadow-lg">
+      <!-- Linha 1: Abas Rápidas e Busca -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <!-- Chips de Tipo/Status -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scroll-smooth no-scrollbar">
+          <button
+            type="button"
+            @click="setFilterTab('ALL')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
           >
-            Anterior
+            Todas
           </button>
-          <button 
-            :disabled="store.pagination.page === store.pagination.totalPages"
-            @click="store.fetchTransactions({ page: store.pagination.page + 1 })"
-            class="px-3 py-1 bg-surface-2 rounded border border-white/10 hover:bg-white/10 disabled:opacity-50 transition-colors cursor-pointer"
+          <button
+            type="button"
+            @click="setFilterTab('DEBIT')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
           >
-            Próxima
+            Despesas
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('CREDIT')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Receitas
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('UNTAGGED')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Sem Categoria
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('PLANNED')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Previstas
+          </button>
+        </div>
+
+        <!-- Campo de Busca -->
+        <div class="relative w-full md:w-72">
+          <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <input
+            v-model="searchInput"
+            type="text"
+            placeholder="Buscar por descrição ou memo..."
+            class="w-full bg-slate-950/70 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent focus:bg-slate-950 transition-colors"
+          />
+          <button 
+            v-if="searchInput" 
+            @click="searchInput = ''"
+            type="button"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white cursor-pointer"
+          >
+            <PhX :size="14" />
           </button>
         </div>
       </div>
+
+      <!-- Linha 2: Dropdowns de Filtros Avançados (Contas, Categorias, Período, Limpar) -->
+      <div class="flex items-center gap-2 flex-wrap pt-1 border-t border-white/5">
+        <!-- 1. Dropdown Multi-Contas com AppSelect -->
+        <div class="w-48 sm:w-56 shrink-0">
+          <AppSelect
+            v-model="store.filters.accounts"
+            :options="accountFilterOptions"
+            mode="multiple"
+            placeholder="Todas as Contas"
+            size="sm"
+            @change="store.fetchTransactions"
+          />
+        </div>
+
+        <!-- 2. Dropdown Multi-Categorias com AppSelect -->
+        <div class="w-48 sm:w-56 shrink-0">
+          <AppSelect
+            v-model="store.filters.tags"
+            :options="tagFilterOptions"
+            mode="multiple"
+            placeholder="Todas as Categorias"
+            size="sm"
+            @change="store.fetchTransactions"
+          />
+        </div>
+
+        <!-- 3. Dropdown de Período -->
+        <div class="relative">
+          <button
+            type="button"
+            @click.stop="isPeriodMenuOpen = !isPeriodMenuOpen; isAccountsMenuOpen = false; isTagsMenuOpen = false"
+            class="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0"
+            :class="activePeriodPreset !== 'ALL' || store.filters.date_from 
+              ? 'bg-accent/15 border-accent/50 text-accent' 
+              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'"
+          >
+            <PhCalendarBlank :size="15" />
+            <span>{{ periodLabels[activePeriodPreset] }}</span>
+            <PhCaretDown :size="12" class="opacity-60" />
+          </button>
+
+          <!-- Menu Flutuante de Período -->
+          <div 
+            v-if="isPeriodMenuOpen" 
+            @click.stop
+            class="absolute left-0 top-full mt-2 w-72 p-3 bg-surface border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col gap-2 backdrop-blur-md"
+          >
+            <div class="text-xs font-bold text-white pb-1.5 border-b border-white/5">
+              Selecione o Período
+            </div>
+
+            <div class="grid grid-cols-1 gap-1">
+              <button
+                v-for="preset in (['PREVIOUS_MONTH', 'CURRENT_MONTH', 'LAST_30', 'CURRENT_YEAR', 'ALL'] as PeriodPreset[])"
+                :key="preset"
+                type="button"
+                @click="setPeriodPreset(preset)"
+                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
+                :class="activePeriodPreset === preset ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
+              >
+                <span>{{ periodLabels[preset] }}</span>
+                <PhCheck v-if="activePeriodPreset === preset" :size="14" weight="bold" />
+              </button>
+
+              <button
+                type="button"
+                @click="activePeriodPreset = 'CUSTOM'"
+                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
+                :class="activePeriodPreset === 'CUSTOM' ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
+              >
+                <span>Personalizado</span>
+                <PhCheck v-if="activePeriodPreset === 'CUSTOM'" :size="14" weight="bold" />
+              </button>
+            </div>
+
+            <!-- Campos de Data Personalizada -->
+            <div v-if="activePeriodPreset === 'CUSTOM'" class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <label class="text-[10px] text-white/50 block mb-1">De:</label>
+                  <input
+                    v-model="customDateFrom"
+                    type="date"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div class="flex-1">
+                  <label class="text-[10px] text-white/50 block mb-1">Até:</label>
+                  <input
+                    v-model="customDateTo"
+                    type="date"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="applyCustomDates"
+                class="w-full py-1.5 bg-accent text-bg font-bold rounded-lg text-xs hover:opacity-90 transition-opacity cursor-pointer mt-1"
+              >
+                Aplicar Datas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Botão Limpar Filtros -->
+        <button
+          v-if="hasActiveFilters"
+          type="button"
+          @click="resetAllFilters"
+          class="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer whitespace-nowrap shrink-0 ml-auto"
+        >
+          <PhArrowsCounterClockwise :size="14" />
+          <span>Limpar Filtros</span>
+        </button>
+      </div>
+
+      <!-- Badges de Filtros Ativos -->
+      <div v-if="hasActiveFilters" class="flex items-center gap-1.5 flex-wrap pt-1 text-[11px]">
+        <span class="text-white/40 text-[10px]">Filtros ativos:</span>
+
+        <!-- Badge Busca -->
+        <span 
+          v-if="searchInput" 
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/80"
+        >
+          Busca: "{{ searchInput }}"
+          <button @click="searchInput = ''" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badges de Contas Selecionadas -->
+        <span 
+          v-for="accId in store.filters.accounts" 
+          :key="'badge-acc-' + accId"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent"
+        >
+          {{ getAccountById(accId)?.name || 'Conta' }}
+          <button @click="toggleAccountFilter(accId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badges de Categorias Selecionadas -->
+        <span 
+          v-for="tagId in store.filters.tags" 
+          :key="'badge-tag-' + tagId"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/80"
+        >
+          <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: getTagById(tagId)?.color || '#10b981' }"></span>
+          {{ getTagById(tagId)?.name || 'Categoria' }}
+          <button @click="toggleTagFilter(tagId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badge de Período -->
+        <span 
+          v-if="store.filters.date_from || store.filters.date_to"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300"
+        >
+          Período: {{ formatDate(store.filters.date_from) }} - {{ formatDate(store.filters.date_to) }}
+          <button @click="setPeriodPreset('ALL')" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+      </div>
     </div>
+
+    <!-- Lista de Transações: Layout Responsivo Mobile-First -->
+    <div class="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-xl min-h-[420px] flex flex-col justify-between">
+      <div v-if="store.loading" class="p-12 text-center text-white/50 flex flex-col items-center gap-3">
+        <PhCircleNotch class="animate-spin text-accent" :size="32" />
+        <span class="text-xs font-medium">Carregando extrato...</span>
+      </div>
+
+      <div v-else-if="store.transactions.length === 0" class="p-12 text-center text-white/50 flex flex-col items-center gap-2">
+        <span class="text-base font-semibold text-white/80">Nenhum lançamento localizado</span>
+        <span class="text-xs text-white/40">
+          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um arquivo OFX ou crie um lançamento manual acima.' }}
+        </span>
+        <button 
+          v-if="hasActiveFilters"
+          @click="resetAllFilters"
+          class="mt-2 text-xs text-accent hover:underline cursor-pointer"
+        >
+          Limpar todos os filtros
+        </button>
+      </div>
+
+      <div v-else>
+        <!-- Versão Mobile (Cards Touch-Friendly) -->
+        <div class="flex flex-col divide-y divide-white/5 md:hidden">
+          <div 
+            v-for="t in store.transactions" 
+            :key="t.id"
+            class="p-4 flex flex-col gap-2.5 active:bg-white/5 transition-colors"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-start gap-3 min-w-0">
+                <div 
+                  class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                  :class="t.type === 'CREDIT' ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
+                >
+                  <PhArrowUpRight v-if="t.type === 'CREDIT'" :size="20" weight="bold" />
+                  <PhArrowDownRight v-else :size="20" weight="bold" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <div class="text-sm font-bold text-white truncate">{{ t.name || 'Sem nome' }}</div>
+                  <div class="text-xs text-white/40 truncate">{{ t.memo || getAccountById(t.account_id)?.name || 'Extrato' }}</div>
+                </div>
+              </div>
+
+              <!-- Valor e Status -->
+              <div class="text-right flex-shrink-0">
+                <div 
+                  class="text-sm font-bold whitespace-nowrap"
+                  :class="t.type === 'CREDIT' ? 'text-accent' : 'text-white'"
+                >
+                  {{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}
+                </div>
+                <div class="text-[10px] text-white/40 mt-0.5">
+                  {{ formatDate(t.date_posted) }}
+                </div>
+              </div>
+            </div>
+
+            <!-- Rodapé do Card Mobile: Categoria, Conta e Badges -->
+            <div class="flex items-center justify-between pt-1">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <!-- Seletor de Categoria Principal -->
+                <button
+                  type="button"
+                  @click="toggleCategoryDropdown(t.id, $event)"
+                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer active:scale-95"
+                  :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
+                    backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
+                    borderColor: (getTagById(t.tags[0])?.color || '#10b981') + '40',
+                    color: getTagById(t.tags[0])?.color || '#10b981',
+                  } : {
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    borderColor: 'rgba(255,255,255,0.1)',
+                    color: 'rgba(255,255,255,0.5)',
+                  }"
+                >
+                  <span 
+                    v-if="t.tags && t.tags.length > 0 && getTagById(t.tags[0])"
+                    class="w-2 h-2 rounded-full" 
+                    :style="{ backgroundColor: getTagById(t.tags[0])?.color }"
+                  ></span>
+                  <span>{{ t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? getTagById(t.tags[0])?.name : '+ Categoria' }}</span>
+                  <PhCaretDown :size="12" class="opacity-50" />
+                </button>
+
+                <!-- Badge de Conta -->
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60">
+                  {{ getAccountById(t.account_id)?.name || 'Conta' }}
+                </span>
+
+                <!-- Badge de Status Planejado -->
+                <span v-if="t.status === 'PLANNED'" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400">
+                  Prevista
+                </span>
+                <span v-if="t.status === 'RECONCILED'" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 border border-blue-500/30 text-blue-400">
+                  Conciliada
+                </span>
+              </div>
+
+              <button 
+                type="button"
+                @click="handleDelete(t.id)" 
+                class="p-1.5 rounded-lg text-white/30 hover:text-red-400 active:text-red-400 transition-colors cursor-pointer"
+                title="Excluir"
+              >
+                <PhTrash :size="16" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Versão Desktop (Tabela de Alta Densidade) -->
+        <table class="hidden md:table w-full text-left border-collapse">
+          <thead>
+            <tr class="bg-white/[0.02] text-xs font-semibold text-white/50 border-b border-white/5">
+              <th class="p-4 min-w-[260px]">ESTABELECIMENTO / MEMO</th>
+              <th class="p-4 w-[130px]">DATA</th>
+              <th class="p-4 min-w-[180px]">CATEGORIA PRINCIPAL</th>
+              <th class="p-4 w-[140px]">CONTA</th>
+              <th class="p-4 text-right w-[150px]">VALOR</th>
+              <th class="p-4 text-center w-[60px]">AÇÕES</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5 text-xs">
+            <tr 
+              v-for="t in store.transactions" 
+              :key="'desk-' + t.id" 
+              class="hover:bg-white/[0.03] transition-colors group"
+            >
+              <td class="p-4">
+                <div class="flex items-center gap-3">
+                  <div 
+                    class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    :class="t.type === 'CREDIT' ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
+                  >
+                    <PhArrowUpRight v-if="t.type === 'CREDIT'" :size="18" weight="bold" />
+                    <PhArrowDownRight v-else :size="18" weight="bold" />
+                  </div>
+                  <div class="min-w-0 max-w-sm">
+                    <div class="font-bold text-white truncate" :title="t.name">{{ t.name || 'Sem nome' }}</div>
+                    <div class="text-[11px] text-white/40 truncate" :title="t.memo">{{ t.memo || 'Sem observações' }}</div>
+                  </div>
+                </div>
+              </td>
+
+              <td class="p-4 text-white/70 whitespace-nowrap">
+                <div class="flex items-center gap-1.5">
+                  <PhCalendarBlank :size="14" class="text-white/40" />
+                  <span>{{ formatDate(t.date_posted) }}</span>
+                </div>
+              </td>
+
+              <td class="p-4">
+                <!-- Seletor de Categoria Desktop -->
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <button
+                    type="button"
+                    @click="toggleCategoryDropdown(t.id, $event)"
+                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer hover:brightness-110 active:scale-95"
+                    :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
+                      backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
+                      borderColor: (getTagById(t.tags[0])?.color || '#10b981') + '40',
+                      color: getTagById(t.tags[0])?.color || '#10b981',
+                    } : {
+                      backgroundColor: 'rgba(255,255,255,0.03)',
+                      borderColor: 'rgba(255,255,255,0.1)',
+                      color: 'rgba(255,255,255,0.4)',
+                    }"
+                  >
+                    <span 
+                      v-if="t.tags && t.tags.length > 0 && getTagById(t.tags[0])"
+                      class="w-2 h-2 rounded-full" 
+                      :style="{ backgroundColor: getTagById(t.tags[0])?.color }"
+                    ></span>
+                    <span>{{ t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? getTagById(t.tags[0])?.name : '+ Categoria' }}</span>
+                    <PhCaretDown :size="12" class="opacity-50" />
+                  </button>
+
+                  <!-- Tags Secundárias -->
+                  <span 
+                    v-for="tagId in (t.tags || []).slice(1)" 
+                    :key="'sec-' + tagId"
+                    class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60"
+                  >
+                    #{{ getTagById(tagId)?.name }}
+                  </span>
+                </div>
+              </td>
+
+              <td class="p-4 text-white/60 whitespace-nowrap">
+                <span class="truncate">{{ getAccountById(t.account_id)?.name || 'Conta' }}</span>
+              </td>
+
+              <td class="p-4 text-right font-bold whitespace-nowrap" :class="t.type === 'CREDIT' ? 'text-accent' : 'text-white'">
+                <div>{{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}</div>
+                <div v-if="t.status === 'PLANNED'" class="text-[10px] text-amber-400 font-medium">Prevista</div>
+                <div v-else-if="t.status === 'RECONCILED'" class="text-[10px] text-blue-400 font-medium">Conciliada</div>
+              </td>
+
+              <td class="p-4 text-center">
+                <button
+                  type="button"
+                  @click="handleDelete(t.id)"
+                  class="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
+                  title="Excluir"
+                >
+                  <PhTrash :size="16" />
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Paginação -->
+        <div v-if="store.pagination.totalPages > 1" class="p-4 border-t border-white/5 flex items-center justify-between text-xs">
+          <span class="text-white/50">
+            Página {{ store.pagination.page }} de {{ store.pagination.totalPages }} ({{ store.pagination.total }} itens)
+          </span>
+          <div class="flex gap-2">
+            <button
+              :disabled="store.pagination.page === 1"
+              @click="store.fetchTransactions({ page: store.pagination.page - 1 })"
+              class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
+            >
+              Anterior
+            </button>
+            <button
+              :disabled="store.pagination.page === store.pagination.totalPages"
+              @click="store.fetchTransactions({ page: store.pagination.page + 1 })"
+              class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
+            >
+              Próxima
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dropdown Teleportado do Seletor de Categoria com Mais Usadas e Busca -->
+    <Teleport to="body">
+      <div 
+        v-if="activeDropdownTxId" 
+        :style="{
+          position: 'absolute',
+          left: dropdownPosition.left,
+          top: dropdownPosition.top,
+          zIndex: 10005,
+        }"
+        @click.stop
+      >
+        <CategoryCombobox
+          :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
+          :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
+          @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
+          @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
+          @close="closeCategoryDropdown"
+        />
+      </div>
+    </Teleport>
+
+    <!-- Banner Flutuante de Propagação para Transações Parecidas -->
+    <SimilarTagPrompt
+      v-if="similarPrompt"
+      :merchant-pattern="similarPrompt.merchantPattern"
+      :category-name="similarPrompt.categoryName"
+      :category-color="similarPrompt.categoryColor"
+      :loading="similarPrompt.loading"
+      @apply-all="handleApplySimilar"
+      @dismiss="similarPrompt = null"
+    />
+
+    <!-- Modal de Reclassificação com IA -->
+    <AIReclassifyModal
+      :is-open="isAIModalOpen"
+      :loading="isAIModalLoading"
+      :result-count="aiResultCount"
+      @confirm="handleConfirmAI"
+      @close="closeAIModal"
+    />
+
+    <!-- Modais Globais de Lançamento e Importação -->
+    <CreateTransactionModal
+      :is-open="isCreateModalOpen"
+      @close="isCreateModalOpen = false"
+      @created="store.fetchTransactions()"
+    />
+
+    <ImportOFXModal
+      :is-open="isImportModalOpen"
+      @close="isImportModalOpen = false"
+      @imported="store.fetchTransactions()"
+    />
   </div>
 </template>

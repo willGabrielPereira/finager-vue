@@ -54,6 +54,12 @@ api.interceptors.response.use(response => {
     isRefreshing = true;
 
     const authStore = useAuthStore();
+    if (!authStore.refreshToken) {
+      isRefreshing = false;
+      authStore.logout();
+      router.push('/login');
+      return Promise.reject(error);
+    }
     try {
       const response = await axios.post(`${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'}/auth/refresh`, {
         refresh_token: authStore.refreshToken
