@@ -1,4 +1,4 @@
-import { defineStore } from 'pinia';
+﻿import { defineStore } from 'pinia';
 import { api } from '../api/axios';
 
 export interface Transaction {
@@ -35,6 +35,10 @@ export const useTransactionsStore = defineStore('transactions', {
       status: '',
       type: '',
       tag: '',
+      accounts: [] as string[],
+      tags: [] as string[],
+      date_from: '',
+      date_to: '',
     },
     loading: false,
   }),
@@ -43,14 +47,29 @@ export const useTransactionsStore = defineStore('transactions', {
     async fetchTransactions(params: Record<string, any> = {}) {
       this.loading = true;
       try {
-        const queryParams = {
+        const queryParams: Record<string, any> = {
           page: params.page ?? this.pagination.page,
           limit: params.limit ?? this.pagination.limit,
           search: params.search !== undefined ? params.search : this.filters.search,
           status: params.status !== undefined ? params.status : this.filters.status,
           type: params.type !== undefined ? params.type : this.filters.type,
-          tag: params.tag !== undefined ? params.tag : this.filters.tag,
+          date_from: params.date_from !== undefined ? params.date_from : this.filters.date_from,
+          date_to: params.date_to !== undefined ? params.date_to : this.filters.date_to,
         };
+
+        const accounts = params.accounts !== undefined ? params.accounts : this.filters.accounts;
+        if (Array.isArray(accounts) && accounts.length > 0) {
+          queryParams.accounts = accounts.join(',');
+        } else if (typeof accounts === 'string' && accounts.trim()) {
+          queryParams.accounts = accounts.trim();
+        }
+
+        const tags = params.tags !== undefined ? params.tags : this.filters.tags;
+        if (Array.isArray(tags) && tags.length > 0) {
+          queryParams.tags = tags.join(',');
+        } else if (params.tag || this.filters.tag) {
+          queryParams.tag = params.tag || this.filters.tag;
+        }
 
         const cleaned: Record<string, any> = {};
         for (const [k, v] of Object.entries(queryParams)) {
@@ -70,6 +89,18 @@ export const useTransactionsStore = defineStore('transactions', {
       } finally {
         this.loading = false;
       }
+    },
+
+    clearFilters() {
+      this.filters.search = '';
+      this.filters.status = '';
+      this.filters.type = '';
+      this.filters.tag = '';
+      this.filters.accounts = [];
+      this.filters.tags = [];
+      this.filters.date_from = '';
+      this.filters.date_to = '';
+      this.pagination.page = 1;
     },
 
     async updateTags(txId: string, tagIds: string[]) {

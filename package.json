@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@phosphor-icons/vue": "^2.2.1",
+    "@vueform/multiselect": "^2.6.11",
     "axios": "^1.15.0",
     "chart.js": "^4.5.1",
     "class-variance-authority": "^0.7.1",

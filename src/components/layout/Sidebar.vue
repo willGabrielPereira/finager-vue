@@ -1,7 +1,8 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { 
   PhSquaresFour, 
   PhListDashes, 
+  PhBank,
   PhUploadSimple, 
   PhTag, 
   PhUser, 
@@ -20,6 +21,7 @@ const route = useRoute()
 const navItems = [
   { name: 'Dashboard', path: '/', icon: PhSquaresFour },
   { name: 'Transações', path: '/transactions', icon: PhListDashes },
+  { name: 'Contas Bancárias', path: '/accounts', icon: PhBank },
   { name: 'Importar OFX', path: '/import', icon: PhUploadSimple },
   { name: 'Categorias & Tags', path: '/tags', icon: PhTag },
   { name: 'Meu Perfil', path: '/profile', icon: PhUser },

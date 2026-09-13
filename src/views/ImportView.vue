@@ -11,7 +11,10 @@ import {
   PhArrowRight,
   PhWarningCircle,
   PhLightning,
-  PhArrowsClockwise
+  PhArrowsClockwise,
+  PhPlus,
+  PhUsers,
+  PhLock
 } from '@phosphor-icons/vue'
 
 const router = useRouter()
@@ -179,38 +182,74 @@ const resetForm = () => {
     <!-- Formulário de Importação -->
     <div v-else class="flex flex-col gap-6">
       <div class="bg-surface rounded-2xl p-6 sm:p-8 border border-white/5 shadow-md flex flex-col gap-6">
-        <!-- Seleção de Conta -->
+        <!-- Seleção de Conta Bancária -->
         <div>
-          <label class="text-xs font-semibold text-white/80 mb-2 flex items-center gap-1.5">
-            <PhBank :size="15" class="text-accent" />
-            <span>Selecione a Conta ou Cartão de Destino</span>
-          </label>
-          <div v-if="accounts.length === 0" class="p-4 rounded-xl bg-white/5 border border-white/10 text-white/60 text-xs flex items-center justify-between">
-            <span>Nenhuma conta encontrada. Crie uma conta antes de importar.</span>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-semibold text-white/80 flex items-center gap-1.5">
+              <PhBank :size="15" class="text-accent" />
+              <span>Selecione a Conta ou Cartão de Destino do Extrato:</span>
+            </label>
+            <button
+              type="button"
+              @click="router.push('/accounts')"
+              class="text-xs text-accent hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <PhPlus :size="13" weight="bold" />
+              <span>Gerenciar Contas</span>
+            </button>
           </div>
+
+          <p class="text-[11px] text-white/40 mb-3">
+            O arquivo OFX será vinculado à conta bancária selecionada abaixo. Escolha se os lançamentos pertencem a uma Conta Corrente ou a um Cartão de Crédito.
+          </p>
+
+          <!-- Estado Sem Contas -->
+          <div v-if="accounts.length === 0" class="p-6 rounded-2xl bg-white/5 border border-white/10 text-center flex flex-col items-center gap-3">
+            <p class="text-xs text-white/60">Você ainda não possui contas bancárias cadastradas.</p>
+            <button
+              type="button"
+              @click="router.push('/accounts')"
+              class="px-4 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
+            >
+              <PhPlus :size="14" weight="bold" />
+              <span>Cadastrar Minha Primeira Conta</span>
+            </button>
+          </div>
+
+          <!-- Grade de Contas Selecionáveis -->
           <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
             <button
               v-for="acc in accounts"
               :key="acc.id"
               type="button"
               @click="selectedAccountId = acc.id"
-              class="p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3"
+              class="p-3.5 rounded-xl border text-left transition-all cursor-pointer flex items-center gap-3 relative"
               :class="selectedAccountId === acc.id 
-                ? 'bg-accent/15 border-accent text-white shadow-sm' 
+                ? 'bg-accent/15 border-accent text-white shadow-sm ring-1 ring-accent/40' 
                 : 'bg-bg/60 border-white/5 text-white/70 hover:bg-white/5 hover:border-white/10'"
             >
               <div 
-                class="w-9 h-9 rounded-lg flex items-center justify-center text-sm"
+                class="w-10 h-10 rounded-xl flex items-center justify-center text-sm shrink-0"
                 :class="acc.type === 'CREDIT_CARD' ? 'bg-amber-500/20 text-amber-300' : 'bg-accent/20 text-accent'"
               >
-                <PhCreditCard v-if="acc.type === 'CREDIT_CARD'" :size="18" weight="duotone" />
-                <PhBank v-else :size="18" weight="duotone" />
+                <PhCreditCard v-if="acc.type === 'CREDIT_CARD'" :size="20" weight="duotone" />
+                <PhBank v-else :size="20" weight="duotone" />
               </div>
               <div class="flex-1 min-w-0">
                 <p class="text-xs font-bold truncate text-white">{{ acc.name }}</p>
-                <p class="text-[11px] text-white/40 truncate">
-                  {{ acc.type === 'CREDIT_CARD' ? 'Cartão de Crédito' : 'Conta Corrente' }}
-                </p>
+                <div class="flex items-center gap-1.5 mt-0.5">
+                  <span class="text-[10px] px-1.5 py-0.2 rounded bg-white/5 text-white/60">
+                    {{ acc.type === 'CREDIT_CARD' ? 'Cartão de Crédito' : 'Conta Corrente' }}
+                  </span>
+                  <span 
+                    class="text-[10px] flex items-center gap-0.5"
+                    :class="acc.is_shared ? 'text-blue-400' : 'text-amber-400/80'"
+                  >
+                    <PhUsers v-if="acc.is_shared" :size="10" />
+                    <PhLock v-else :size="10" />
+                    <span>{{ acc.is_shared ? 'Familiar' : 'Privada' }}</span>
+                  </span>
+                </div>
               </div>
             </button>
           </div>
@@ -310,8 +349,8 @@ const resetForm = () => {
             <PhCreditCard :size="18" weight="duotone" />
           </div>
           <div>
-            <h3 class="text-xs font-bold text-white">Cartões e Contas</h3>
-            <p class="text-[11px] text-white/50 mt-0.5">Compatível com arquivos OFX bancários e faturas de cartão de crédito Nubank, Santander, etc.</p>
+            <h3 class="text-xs font-bold text-white">Contas vs Cartões</h3>
+            <p class="text-[11px] text-white/50 mt-0.5">Faturas de cartão de crédito não somam com o pagamento da fatura no débito da conta corrente.</p>
           </div>
         </div>
       </div>

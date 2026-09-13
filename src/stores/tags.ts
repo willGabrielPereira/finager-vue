@@ -24,8 +24,13 @@ export const useTagsStore = defineStore('tags', {
       try {
         const { data } = await api.get('/tags');
         this.tags = data || [];
-      } catch (err) {
-        console.error('Falha ao buscar tags:', err);
+        return this.tags;
+      } catch (err: any) {
+        if (err.response?.status !== 401 && err.response?.status !== 400) {
+          console.warn('Falha ao buscar tags:', err?.message || err);
+        }
+        this.tags = [];
+        return [];
       } finally {
         this.loading = false;
       }

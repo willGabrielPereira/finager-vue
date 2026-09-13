@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/axios'
 import { useTagsStore } from '../stores/tags'
+import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
 import { 
   PhListDashes, 
   PhPlus, 
@@ -36,6 +37,15 @@ const errorMsg = ref('')
 
 const newPattern = ref('')
 const newTagId = ref('')
+
+const tagOptions = computed<AppSelectOption[]>(() => {
+  return tagsStore.tags.map(tag => ({
+    value: tag.id,
+    label: tag.name,
+    color: tag.color || '#10b981'
+  }))
+})
+
 
 const fetchRules = async () => {
   loading.value = true
@@ -118,7 +128,7 @@ const handleDeleteRule = async (id: string) => {
       <button
         type="button"
         @click="isCreateModalOpen = true"
-        class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-accent text-bg font-bold text-xs sm:text-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/15"
+        class="flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-accent text-bg font-bold text-xs sm:text-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/15 whitespace-nowrap shrink-0"
       >
         <PhPlus :size="16" weight="bold" />
         <span>Nova Regra</span>
@@ -262,19 +272,12 @@ const handleDeleteRule = async (id: string) => {
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">
               Categoria / Tag Vinculada
             </label>
-            <select
+            <AppSelect
               v-model="newTagId"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent"
-            >
-              <option value="" disabled selected>Selecione uma categoria...</option>
-              <option 
-                v-for="tag in tagsStore.tags" 
-                :key="tag.id" 
-                :value="tag.id"
-              >
-                {{ tag.name }}
-              </option>
-            </select>
+              :options="tagOptions"
+              placeholder="Selecione uma categoria..."
+              size="md"
+            />
           </div>
 
           <div v-if="errorMsg" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl">

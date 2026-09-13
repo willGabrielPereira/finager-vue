@@ -1,0 +1,108 @@
+:root {
+  --ms-font-size: 0.8125rem;
+  --ms-line-height: 1.25rem;
+  --ms-bg: #0b1329;
+  --ms-bg-disabled: rgba(255, 255, 255, 0.04);
+  --ms-border-color: rgba(255, 255, 255, 0.1);
+  --ms-border-width: 1px;
+  --ms-border-color-active: #22c55e;
+  --ms-border-width-active: 1px;
+  --ms-radius: 0.75rem;
+  --ms-py: 0.45rem;
+  --ms-px: 0.75rem;
+  --ms-ring-width: 2px;
+  --ms-ring-color: rgba(34, 197, 94, 0.25);
+  --ms-placeholder-color: rgba(255, 255, 255, 0.45);
+  --ms-max-height: 16rem;
+
+  --ms-dropdown-bg: #131b2e;
+  --ms-dropdown-border-color: rgba(255, 255, 255, 0.12);
+  --ms-dropdown-border-width: 1px;
+  --ms-dropdown-radius: 0.875rem;
+
+  --ms-option-font-size: 0.8125rem;
+  --ms-option-line-height: 1.25rem;
+  --ms-option-bg-pointed: rgba(255, 255, 255, 0.08);
+  --ms-option-bg-selected: rgba(34, 197, 94, 0.18);
+  --ms-option-color-selected: #4ade80;
+  --ms-option-bg-selected-pointed: rgba(34, 197, 94, 0.25);
+  --ms-option-color-selected-pointed: #4ade80;
+  --ms-option-py: 0.55rem;
+  --ms-option-px: 0.75rem;
+
+  --ms-tag-bg: rgba(34, 197, 94, 0.15);
+  --ms-tag-color: #4ade80;
+  --ms-tag-radius: 0.5rem;
+  --ms-tag-font-size: 0.75rem;
+  --ms-tag-font-weight: 600;
+  --ms-tag-py: 0.15rem;
+  --ms-tag-px: 0.5rem;
+  --ms-tag-my: 0.2rem;
+  --ms-tag-mx: 0.2rem;
+
+  --ms-caret-color: rgba(255, 255, 255, 0.5);
+  --ms-clear-color: rgba(255, 255, 255, 0.4);
+  --ms-clear-color-hover: #ffffff;
+  --ms-spinner-color: #22c55e;
+  --ms-empty-color: rgba(255, 255, 255, 0.4);
+}
+
+.multiselect {
+  background: #0b1329 !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #ffffff !important;
+  border-radius: 0.75rem !important;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  transition: all 0.15s ease-in-out;
+}
+
+.multiselect.is-active {
+  border-color: #22c55e !important;
+  box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.25) !important;
+}
+
+.multiselect-dropdown {
+  background: #131b2e !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 0.875rem !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.6);
+  z-index: 99999 !important;
+  overflow: hidden;
+}
+
+.multiselect-option {
+  color: rgba(255, 255, 255, 0.85);
+  transition: background-color 0.1s ease;
+}
+
+.multiselect-option.is-pointed {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+}
+
+.multiselect-option.is-selected {
+  background: rgba(34, 197, 94, 0.18) !important;
+  color: #4ade80 !important;
+  font-weight: 600;
+}
+
+.multiselect-option.is-selected.is-pointed {
+  background: rgba(34, 197, 94, 0.25) !important;
+  color: #4ade80 !important;
+}
+
+.multiselect-options {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.multiselect-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.multiselect-options::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}

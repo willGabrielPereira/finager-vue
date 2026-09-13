@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
+import AppSelect from '../components/ui/AppSelect.vue'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
 import CategoryCombobox from '../components/ui/CategoryCombobox.vue'
@@ -14,18 +15,23 @@ import {
   PhCalendarBlank, 
   PhCaretDown, 
   PhPlus, 
-  PhCircleNotch,
-  PhSparkle,
-  PhUploadSimple,
-  PhTrash,
-  PhMagnifyingGlass
+  PhCircleNotch, 
+  PhSparkle, 
+  PhUploadSimple, 
+  PhTrash, 
+  PhMagnifyingGlass, 
+  PhBank, 
+  PhCreditCard, 
+  PhX, 
+  PhCheck, 
+  PhArrowsCounterClockwise 
 } from '@phosphor-icons/vue'
 
 const store = useTransactionsStore()
 const tagsStore = useTagsStore()
 const accountsStore = useAccountsStore()
 
-// Estado do Seletor de Categoria
+// Estado do Seletor de Categoria Inline
 const activeDropdownTxId = ref<string | null>(null)
 const updatingTxId = ref<string | null>(null)
 const dropdownPosition = ref({ left: '0px', top: '0px' })
@@ -51,6 +57,26 @@ const similarPrompt = ref<{
 const searchInput = ref('')
 const activeFilterTab = ref<'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED'>('ALL')
 
+// Dropdowns de Filtro Avançado
+const isAccountsMenuOpen = ref(false)
+const isTagsMenuOpen = ref(false)
+const isPeriodMenuOpen = ref(false)
+const tagSearchQuery = ref('')
+
+type PeriodPreset = 'ALL' | 'PREVIOUS_MONTH' | 'CURRENT_MONTH' | 'LAST_30' | 'CURRENT_YEAR' | 'CUSTOM'
+const activePeriodPreset = ref<PeriodPreset>('ALL')
+const customDateFrom = ref('')
+const customDateTo = ref('')
+
+const periodLabels: Record<PeriodPreset, string> = {
+  ALL: 'Todo o histórico',
+  PREVIOUS_MONTH: 'Mês anterior',
+  CURRENT_MONTH: 'Mês atual',
+  LAST_30: 'Últimos 30 dias',
+  CURRENT_YEAR: 'Este ano',
+  CUSTOM: 'Personalizado',
+}
+
 onMounted(async () => {
   await Promise.all([
     store.fetchTransactions(),
@@ -58,12 +84,19 @@ onMounted(async () => {
     tagsStore.fetchFrequentTags(60, 6),
     accountsStore.fetchAccounts()
   ])
-  window.addEventListener('click', closeDropdown)
+  window.addEventListener('click', onWindowClick)
 })
 
 onUnmounted(() => {
-  window.removeEventListener('click', closeDropdown)
+  window.removeEventListener('click', onWindowClick)
 })
+
+const onWindowClick = () => {
+  closeCategoryDropdown()
+  isAccountsMenuOpen.value = false
+  isTagsMenuOpen.value = false
+  isPeriodMenuOpen.value = false
+}
 
 // Busca com debounce
 let searchTimeout: any = null
@@ -89,11 +122,129 @@ const setFilterTab = (tab: 'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED') 
   } else if (tab === 'CREDIT') {
     store.filters.type = 'CREDIT'
     store.filters.status = ''
+  } else if (tab === 'UNTAGGED') {
+    store.filters.type = ''
+    store.filters.status = 'UNTAGGED'
   } else if (tab === 'PLANNED') {
     store.filters.type = ''
     store.filters.status = 'PLANNED'
   }
 
+  store.fetchTransactions()
+}
+
+// Filtro Multi-Contas
+const toggleAccountFilter = (accId: string) => {
+  const current = [...store.filters.accounts]
+  const idx = current.indexOf(accId)
+  if (idx >= 0) {
+    current.splice(idx, 1)
+  } else {
+    current.push(accId)
+  }
+  store.filters.accounts = current
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+
+const accountFilterOptions = computed(() => {
+  return accountsStore.accounts.map((a) => ({
+    value: a.id,
+    label: a.name,
+    badge: a.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
+    icon: a.type === 'CREDIT_CARD' ? PhCreditCard : PhBank,
+  }))
+})
+
+
+
+const toggleTagFilter = (tagId: string) => {
+  store.filters.tags = store.filters.tags.filter(id => id !== tagId);
+  store.pagination.page = 1;
+  store.fetchTransactions();
+};
+
+const tagFilterOptions = computed(() => {
+  return tagsStore.tags.map((t) => ({
+    value: t.id,
+    label: t.name,
+    color: t.color,
+  }))
+})
+
+// Filtro de Período
+const setPeriodPreset = (preset: PeriodPreset) => {
+  activePeriodPreset.value = preset
+  const now = new Date()
+
+  if (preset === 'ALL') {
+    store.filters.date_from = ''
+    store.filters.date_to = ''
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CURRENT_MONTH') {
+    const y = now.getFullYear()
+    const m = now.getMonth()
+    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'PREVIOUS_MONTH') {
+    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    const y = prevDate.getFullYear()
+    const m = prevDate.getMonth()
+    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
+    const lastDay = new Date(y, m + 1, 0).getDate()
+    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'LAST_30') {
+    const d30 = new Date()
+    d30.setDate(now.getDate() - 30)
+    store.filters.date_from = d30.toISOString().split('T')[0]
+    store.filters.date_to = now.toISOString().split('T')[0]
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CURRENT_YEAR') {
+    const y = now.getFullYear()
+    store.filters.date_from = `${y}-01-01`
+    store.filters.date_to = `${y}-12-31`
+    isPeriodMenuOpen.value = false
+  } else if (preset === 'CUSTOM') {
+    return
+  }
+
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+const applyCustomDates = () => {
+  store.filters.date_from = customDateFrom.value
+  store.filters.date_to = customDateTo.value
+  isPeriodMenuOpen.value = false
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+// Reset de Todos os Filtros
+const hasActiveFilters = computed(() => {
+  return (
+    searchInput.value !== '' ||
+    activeFilterTab.value !== 'ALL' ||
+    store.filters.accounts.length > 0 ||
+    store.filters.tags.length > 0 ||
+    activePeriodPreset.value !== 'ALL' ||
+    Boolean(store.filters.date_from) ||
+    Boolean(store.filters.date_to)
+  )
+})
+
+const resetAllFilters = () => {
+  store.clearFilters()
+  activeFilterTab.value = 'ALL'
+  searchInput.value = ''
+  activePeriodPreset.value = 'ALL'
+  customDateFrom.value = ''
+  customDateTo.value = ''
+  tagSearchQuery.value = ''
   store.fetchTransactions()
 }
 
@@ -105,12 +256,15 @@ const getAccountById = (id: string) => {
   return accountsStore.accounts.find((a) => a.id === id)
 }
 
-const toggleDropdown = (txId: string, event: Event) => {
+const toggleCategoryDropdown = (txId: string, event: Event) => {
   event.stopPropagation()
   if (activeDropdownTxId.value === txId) {
     activeDropdownTxId.value = null
   } else {
     activeDropdownTxId.value = txId
+    isAccountsMenuOpen.value = false
+    isTagsMenuOpen.value = false
+    isPeriodMenuOpen.value = false
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
     const scrollTop = window.scrollY || document.documentElement.scrollTop
@@ -129,12 +283,12 @@ const toggleDropdown = (txId: string, event: Event) => {
   }
 }
 
-const closeDropdown = () => {
+const closeCategoryDropdown = () => {
   activeDropdownTxId.value = null
 }
 
 const onCategorySelected = async (txId: string, tagId: string | null) => {
-  closeDropdown()
+  closeCategoryDropdown()
   updatingTxId.value = txId
 
   const tx = store.transactions.find((t) => t.id === txId)
@@ -146,7 +300,6 @@ const onCategorySelected = async (txId: string, tagId: string | null) => {
   try {
     await store.updateTags(txId, newTags)
 
-    // Se selecionou uma categoria válida, ativa o prompt de propagação para similares
     if (tagId) {
       const tagObj = getTagById(tagId)
       similarPrompt.value = {
@@ -237,91 +390,272 @@ const formatCurrency = (val: number) => {
 <template>
   <div class="flex flex-col gap-5">
     <!-- Barra Superior: Título e Botões de Ação -->
-    <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
-      <div>
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight">Extrato & Transações</h1>
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div class="min-w-0">
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Extrato & Transações</h1>
         <p class="text-xs text-white/50">Gerencie seus lançamentos bancários, manuais e faturas</p>
       </div>
 
-      <div class="flex items-center gap-2 flex-wrap">
+      <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
         <button 
           @click="isAIModalOpen = true"
-          class="flex items-center gap-1.5 border border-accent/40 bg-accent/10 hover:bg-accent/20 text-accent px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-sm hover:scale-105 active:scale-95"
+          class="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-accent/50 active:scale-95 shrink-0"
         >
-          <PhSparkle :size="16" weight="fill" />
+          <PhSparkle :size="15" weight="fill" />
           <span>Classificar com IA</span>
         </button>
 
         <button 
           @click="isImportModalOpen = true" 
-          class="hidden md:flex items-center gap-1.5 border border-white/10 bg-white/5 hover:bg-white/10 text-white px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+          class="inline-flex items-center gap-1.5 border border-white/10 bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-white/20 active:scale-95 shrink-0"
         >
-          <PhUploadSimple :size="16" />
+          <PhUploadSimple :size="15" />
           <span>Importar OFX</span>
         </button>
 
         <button 
           @click="isCreateModalOpen = true" 
-          class="flex items-center gap-1.5 bg-accent text-bg px-4 py-2 rounded-xl text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20 hover:scale-105 active:scale-95"
+          class="inline-flex items-center gap-1.5 bg-accent hover:bg-accent/90 text-bg px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shadow-md shadow-accent/20 active:scale-95 shrink-0"
         >
-          <PhPlus :size="16" weight="bold" />
+          <PhPlus :size="15" weight="bold" />
           <span>Novo Lançamento</span>
         </button>
       </div>
     </div>
 
-    <!-- Barra de Filtros e Busca Rápida -->
-    <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 bg-surface p-3 rounded-2xl border border-white/5">
-      <!-- Chips de Filtro Rápido -->
-      <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scroll-smooth no-scrollbar">
+    <!-- Bloco de Filtros Principal -->
+    <div class="bg-surface rounded-2xl border border-white/5 p-3.5 flex flex-col gap-3 shadow-lg">
+      <!-- Linha 1: Abas Rápidas e Busca -->
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <!-- Chips de Tipo/Status -->
+        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scroll-smooth no-scrollbar">
+          <button
+            type="button"
+            @click="setFilterTab('ALL')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Todas
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('DEBIT')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Despesas
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('CREDIT')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Receitas
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('UNTAGGED')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Sem Categoria
+          </button>
+          <button
+            type="button"
+            @click="setFilterTab('PLANNED')"
+            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
+            :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Previstas
+          </button>
+        </div>
+
+        <!-- Campo de Busca -->
+        <div class="relative w-full md:w-72">
+          <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
+          <input
+            v-model="searchInput"
+            type="text"
+            placeholder="Buscar por descrição ou memo..."
+            class="w-full bg-slate-950/70 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent focus:bg-slate-950 transition-colors"
+          />
+          <button 
+            v-if="searchInput" 
+            @click="searchInput = ''"
+            type="button"
+            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white cursor-pointer"
+          >
+            <PhX :size="14" />
+          </button>
+        </div>
+      </div>
+
+      <!-- Linha 2: Dropdowns de Filtros Avançados (Contas, Categorias, Período, Limpar) -->
+      <div class="flex items-center gap-2 flex-wrap pt-1 border-t border-white/5">
+        <!-- 1. Dropdown Multi-Contas com AppSelect -->
+        <div class="w-48 sm:w-56 shrink-0">
+          <AppSelect
+            v-model="store.filters.accounts"
+            :options="accountFilterOptions"
+            mode="multiple"
+            placeholder="Todas as Contas"
+            size="sm"
+            @change="store.fetchTransactions"
+          />
+        </div>
+
+        <!-- 2. Dropdown Multi-Categorias com AppSelect -->
+        <div class="w-48 sm:w-56 shrink-0">
+          <AppSelect
+            v-model="store.filters.tags"
+            :options="tagFilterOptions"
+            mode="multiple"
+            placeholder="Todas as Categorias"
+            size="sm"
+            @change="store.fetchTransactions"
+          />
+        </div>
+
+        <!-- 3. Dropdown de Período -->
+        <div class="relative">
+          <button
+            type="button"
+            @click.stop="isPeriodMenuOpen = !isPeriodMenuOpen; isAccountsMenuOpen = false; isTagsMenuOpen = false"
+            class="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0"
+            :class="activePeriodPreset !== 'ALL' || store.filters.date_from 
+              ? 'bg-accent/15 border-accent/50 text-accent' 
+              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'"
+          >
+            <PhCalendarBlank :size="15" />
+            <span>{{ periodLabels[activePeriodPreset] }}</span>
+            <PhCaretDown :size="12" class="opacity-60" />
+          </button>
+
+          <!-- Menu Flutuante de Período -->
+          <div 
+            v-if="isPeriodMenuOpen" 
+            @click.stop
+            class="absolute left-0 top-full mt-2 w-72 p-3 bg-surface border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col gap-2 backdrop-blur-md"
+          >
+            <div class="text-xs font-bold text-white pb-1.5 border-b border-white/5">
+              Selecione o Período
+            </div>
+
+            <div class="grid grid-cols-1 gap-1">
+              <button
+                v-for="preset in (['PREVIOUS_MONTH', 'CURRENT_MONTH', 'LAST_30', 'CURRENT_YEAR', 'ALL'] as PeriodPreset[])"
+                :key="preset"
+                type="button"
+                @click="setPeriodPreset(preset)"
+                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
+                :class="activePeriodPreset === preset ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
+              >
+                <span>{{ periodLabels[preset] }}</span>
+                <PhCheck v-if="activePeriodPreset === preset" :size="14" weight="bold" />
+              </button>
+
+              <button
+                type="button"
+                @click="activePeriodPreset = 'CUSTOM'"
+                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
+                :class="activePeriodPreset === 'CUSTOM' ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
+              >
+                <span>Personalizado</span>
+                <PhCheck v-if="activePeriodPreset === 'CUSTOM'" :size="14" weight="bold" />
+              </button>
+            </div>
+
+            <!-- Campos de Data Personalizada -->
+            <div v-if="activePeriodPreset === 'CUSTOM'" class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
+              <div class="flex items-center gap-2">
+                <div class="flex-1">
+                  <label class="text-[10px] text-white/50 block mb-1">De:</label>
+                  <input
+                    v-model="customDateFrom"
+                    type="date"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                  />
+                </div>
+                <div class="flex-1">
+                  <label class="text-[10px] text-white/50 block mb-1">Até:</label>
+                  <input
+                    v-model="customDateTo"
+                    type="date"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                  />
+                </div>
+              </div>
+              <button
+                type="button"
+                @click="applyCustomDates"
+                class="w-full py-1.5 bg-accent text-bg font-bold rounded-lg text-xs hover:opacity-90 transition-opacity cursor-pointer mt-1"
+              >
+                Aplicar Datas
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 4. Botão Limpar Filtros -->
         <button
+          v-if="hasActiveFilters"
           type="button"
-          @click="setFilterTab('ALL')"
-          class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-          :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          @click="resetAllFilters"
+          class="flex items-center gap-1.5 px-3 h-9 rounded-xl text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all cursor-pointer whitespace-nowrap shrink-0 ml-auto"
         >
-          Todas
-        </button>
-        <button
-          type="button"
-          @click="setFilterTab('DEBIT')"
-          class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-          :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-        >
-          Despesas
-        </button>
-        <button
-          type="button"
-          @click="setFilterTab('CREDIT')"
-          class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-          :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-        >
-          Receitas
-        </button>
-        <button
-          type="button"
-          @click="setFilterTab('PLANNED')"
-          class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-          :class="activeFilterTab === 'PLANNED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-        >
-          Previstas / Planejadas
+          <PhArrowsCounterClockwise :size="14" />
+          <span>Limpar Filtros</span>
         </button>
       </div>
 
-      <!-- Campo de Busca por Digitação -->
-      <div class="relative min-w-[240px]">
-        <PhMagnifyingGlass class="absolute left-3 top-2.5 text-white/40" :size="16" />
-        <input
-          v-model="searchInput"
-          type="text"
-          placeholder="Buscar estabelecimento, memo..."
-          class="w-full bg-slate-950/80 border border-white/10 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent focus:bg-slate-950 transition-colors"
-        />
+      <!-- Badges de Filtros Ativos -->
+      <div v-if="hasActiveFilters" class="flex items-center gap-1.5 flex-wrap pt-1 text-[11px]">
+        <span class="text-white/40 text-[10px]">Filtros ativos:</span>
+
+        <!-- Badge Busca -->
+        <span 
+          v-if="searchInput" 
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/80"
+        >
+          Busca: "{{ searchInput }}"
+          <button @click="searchInput = ''" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badges de Contas Selecionadas -->
+        <span 
+          v-for="accId in store.filters.accounts" 
+          :key="'badge-acc-' + accId"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent"
+        >
+          {{ getAccountById(accId)?.name || 'Conta' }}
+          <button @click="toggleAccountFilter(accId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badges de Categorias Selecionadas -->
+        <span 
+          v-for="tagId in store.filters.tags" 
+          :key="'badge-tag-' + tagId"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/80"
+        >
+          <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: getTagById(tagId)?.color || '#10b981' }"></span>
+          {{ getTagById(tagId)?.name || 'Categoria' }}
+          <button @click="toggleTagFilter(tagId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
+        <!-- Badge de Período -->
+        <span 
+          v-if="store.filters.date_from || store.filters.date_to"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300"
+        >
+          Período: {{ formatDate(store.filters.date_from) }} - {{ formatDate(store.filters.date_to) }}
+          <button @click="setPeriodPreset('ALL')" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
       </div>
     </div>
 
     <!-- Lista de Transações: Layout Responsivo Mobile-First -->
-    <div class="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-xl">
+    <div class="bg-surface rounded-2xl border border-white/5 overflow-hidden shadow-xl min-h-[420px] flex flex-col justify-between">
       <div v-if="store.loading" class="p-12 text-center text-white/50 flex flex-col items-center gap-3">
         <PhCircleNotch class="animate-spin text-accent" :size="32" />
         <span class="text-xs font-medium">Carregando extrato...</span>
@@ -329,7 +663,16 @@ const formatCurrency = (val: number) => {
 
       <div v-else-if="store.transactions.length === 0" class="p-12 text-center text-white/50 flex flex-col items-center gap-2">
         <span class="text-base font-semibold text-white/80">Nenhum lançamento localizado</span>
-        <span class="text-xs text-white/40">Importe um arquivo OFX ou crie um lançamento manual acima.</span>
+        <span class="text-xs text-white/40">
+          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um arquivo OFX ou crie um lançamento manual acima.' }}
+        </span>
+        <button 
+          v-if="hasActiveFilters"
+          @click="resetAllFilters"
+          class="mt-2 text-xs text-accent hover:underline cursor-pointer"
+        >
+          Limpar todos os filtros
+        </button>
       </div>
 
       <div v-else>
@@ -369,13 +712,13 @@ const formatCurrency = (val: number) => {
               </div>
             </div>
 
-            <!-- Rodapé do Card Mobile: Categoria e Badges -->
+            <!-- Rodapé do Card Mobile: Categoria, Conta e Badges -->
             <div class="flex items-center justify-between pt-1">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <!-- Seletor de Categoria Principal -->
                 <button
                   type="button"
-                  @click="toggleDropdown(t.id, $event)"
+                  @click="toggleCategoryDropdown(t.id, $event)"
                   class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer active:scale-95"
                   :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
                     backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
@@ -396,9 +739,14 @@ const formatCurrency = (val: number) => {
                   <PhCaretDown :size="12" class="opacity-50" />
                 </button>
 
+                <!-- Badge de Conta -->
+                <span class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60">
+                  {{ getAccountById(t.account_id)?.name || 'Conta' }}
+                </span>
+
                 <!-- Badge de Status Planejado -->
                 <span v-if="t.status === 'PLANNED'" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 border border-amber-500/30 text-amber-400">
-                  Planejada
+                  Prevista
                 </span>
                 <span v-if="t.status === 'RECONCILED'" class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-500/15 border border-blue-500/30 text-blue-400">
                   Conciliada
@@ -463,7 +811,7 @@ const formatCurrency = (val: number) => {
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <button
                     type="button"
-                    @click="toggleDropdown(t.id, $event)"
+                    @click="toggleCategoryDropdown(t.id, $event)"
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer hover:brightness-110 active:scale-95"
                     :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
                       backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
@@ -561,7 +909,7 @@ const formatCurrency = (val: number) => {
           :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
           @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
           @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
-          @close="closeDropdown"
+          @close="closeCategoryDropdown"
         />
       </div>
     </Teleport>

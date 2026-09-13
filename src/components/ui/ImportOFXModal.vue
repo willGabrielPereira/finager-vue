@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import AppSelect, { type AppSelectOption } from './AppSelect.vue'
+import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { api } from '../../api/axios'
 import { 
@@ -27,6 +29,16 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
 const importError = ref('')
 const importResult = ref<{ inserted: number; skipped: number; reconciled: number } | null>(null)
+
+const accountOptions = computed<AppSelectOption[]>(() => {
+  return accountsStore.accounts.map(acc => ({
+    value: acc.id,
+    label: acc.name,
+    sublabel: acc.institution,
+    badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
+    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+  }))
+})
 
 onMounted(() => {
   if (accountsStore.accounts.length === 0) {
@@ -165,14 +177,12 @@ const reset = () => {
 
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-white/70">Conta Bancária de Destino</label>
-          <select
+          <AppSelect
             v-model="selectedAccountId"
-            class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-accent cursor-pointer"
-          >
-            <option v-for="acc in accountsStore.accounts" :key="acc.id" :value="acc.id">
-              {{ acc.name }} ({{ acc.institution }})
-            </option>
-          </select>
+            :options="accountOptions"
+            placeholder="Selecione a conta..."
+            :teleport="true"
+          />
         </div>
 
         <div 

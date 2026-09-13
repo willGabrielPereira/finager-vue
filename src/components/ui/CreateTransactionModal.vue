@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
+import AppSelect, { type AppSelectOption } from './AppSelect.vue'
+import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import { useTransactionsStore } from '../../stores/transactions'
@@ -28,6 +30,28 @@ const selectedTagId = ref('')
 const datePosted = ref(new Date().toISOString().split('T')[0])
 const loading = ref(false)
 const errorMessage = ref('')
+
+const accountOptions = computed<AppSelectOption[]>(() => {
+  return accountsStore.accounts.map(acc => ({
+    value: acc.id,
+    label: acc.name,
+    sublabel: acc.institution,
+    badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
+    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+  }))
+})
+
+const tagOptions = computed<AppSelectOption[]>(() => {
+  return [
+    { value: '', label: 'Sem Categoria' },
+    ...tagsStore.tags.map(t => ({
+      value: t.id,
+      label: t.name,
+      color: t.color || '#10b981'
+    }))
+  ]
+})
+
 
 onMounted(() => {
   if (accountsStore.accounts.length === 0) {
@@ -176,27 +200,23 @@ const submit = async () => {
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Conta Bancária</label>
-            <select
+            <AppSelect
               v-model="accountId"
-              class="bg-slate-950 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-accent cursor-pointer truncate"
-            >
-              <option v-for="acc in accountsStore.accounts" :key="acc.id" :value="acc.id">
-                {{ acc.name }} ({{ acc.institution }})
-              </option>
-            </select>
+              :options="accountOptions"
+              placeholder="Selecione a conta..."
+              :teleport="true"
+            />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <select
+            <AppSelect
               v-model="selectedTagId"
-              class="bg-slate-950 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-accent cursor-pointer truncate"
-            >
-              <option value="">Sem Categoria</option>
-              <option v-for="t in tagsStore.tags" :key="t.id" :value="t.id">
-                {{ t.name }}
-              </option>
-            </select>
+              :options="tagOptions"
+              placeholder="Sem Categoria"
+              :clearable="true"
+              :teleport="true"
+            />
           </div>
 
           <div class="flex flex-col gap-1">

@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+﻿import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 
 const router = createRouter({
@@ -8,6 +8,7 @@ const router = createRouter({
     { path: '/register', component: () => import('../views/RegisterView.vue'), meta: { public: true } },
     { path: '/', component: () => import('../views/DashboardView.vue') },
     { path: '/transactions', component: () => import('../views/TransactionsView.vue') },
+    { path: '/accounts', component: () => import('../views/AccountsView.vue') },
     { path: '/import', component: () => import('../views/ImportView.vue') },
     { path: '/tags', component: () => import('../views/TagsView.vue') },
     { path: '/profile', component: () => import('../views/ProfileView.vue') },

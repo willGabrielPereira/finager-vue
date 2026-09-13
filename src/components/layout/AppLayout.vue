@@ -1,13 +1,15 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
 import BottomNav from './BottomNav.vue'
 import CreateTransactionModal from '../ui/CreateTransactionModal.vue'
 import ImportOFXModal from '../ui/ImportOFXModal.vue'
-import { PhPlus, PhUploadSimple, PhX } from '@phosphor-icons/vue'
+import { PhPlus, PhUploadSimple, PhBank, PhX } from '@phosphor-icons/vue'
 import { useTransactionsStore } from '../../stores/transactions'
 
+const router = useRouter()
 const txStore = useTransactionsStore()
 
 const isCreateTxModalOpen = ref(false)
@@ -22,6 +24,11 @@ const openCreateTx = () => {
 const openImport = () => {
   isMobileActionSheetOpen.value = false
   isImportModalOpen.value = true
+}
+
+const openAccounts = () => {
+  isMobileActionSheetOpen.value = false
+  router.push('/accounts')
 }
 
 const onTxCreated = () => {
@@ -50,7 +57,7 @@ const onOFXImported = () => {
       </main>
     </div>
 
-    <!-- Mobile Bottom Navigation -->
+    <!-- Mobile Bottom Navigation (Mantido limpo com 4 itens + FAB) -->
     <BottomNav @open-action-menu="isMobileActionSheetOpen = true" />
 
     <!-- Mobile Action Sheet (Ao clicar no '+' da barra inferior) -->
@@ -96,6 +103,20 @@ const onOFXImported = () => {
           <div>
             <div>Importar Arquivo OFX</div>
             <div class="text-[10px] text-white/50 font-normal">Extrato bancário ou fatura de cartão</div>
+          </div>
+        </button>
+
+        <button
+          type="button"
+          @click="openAccounts"
+          class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 text-white font-bold text-xs hover:bg-white/10 transition-colors cursor-pointer text-left"
+        >
+          <div class="w-9 h-9 rounded-xl bg-white/10 text-accent flex items-center justify-center">
+            <PhBank :size="20" weight="duotone" />
+          </div>
+          <div>
+            <div>Gerenciar Contas Bancárias</div>
+            <div class="text-[10px] text-white/50 font-normal">Contas correntes, cartões e privacidade</div>
           </div>
         </button>
       </div>
