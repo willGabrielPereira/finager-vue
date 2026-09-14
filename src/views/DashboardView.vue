@@ -156,22 +156,26 @@ const getTagById = (id: string) => {
   return tagsStore.tags.find(t => t.id === id)
 }
 
+const isCredit = (t: any) => {
+  return t.amount > 0
+}
+
 // Métricas de Caixa do Mês Selecionado
 const totalIncome = computed(() => {
   return txStore.transactions
-    .filter(t => t.type === 'CREDIT' && t.status !== 'PLANNED' && !t.is_transfer)
-    .reduce((acc, t) => acc + t.amount, 0)
+    .filter(t => isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer)
+    .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 })
 
 const totalExpenses = computed(() => {
   return txStore.transactions
-    .filter(t => t.type === 'DEBIT' && t.status !== 'PLANNED' && !t.is_transfer)
+    .filter(t => !isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer)
     .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 })
 
 const totalPlanned = computed(() => {
   return txStore.transactions
-    .filter(t => t.type === 'DEBIT' && t.status === 'PLANNED')
+    .filter(t => !isCredit(t) && t.status === 'PLANNED')
     .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 })
 
@@ -192,7 +196,7 @@ const chartData = computed(() => {
   const categoryTotals: Record<string, { total: number; color: string; name: string }> = {}
 
   for (const t of txStore.transactions) {
-    if (t.type === 'DEBIT' && !t.is_transfer) {
+    if (!isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer) {
       const tagId = t.tags?.[0]
       const tag = tagId ? getTagById(tagId) : null
       const name = tag?.name || 'Sem Categoria'

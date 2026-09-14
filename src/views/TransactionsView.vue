@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
+import { useAuthStore } from '../stores/auth'
 import AppSelect from '../components/ui/AppSelect.vue'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
@@ -9,6 +10,8 @@ import SimilarTagPrompt from '../components/ui/SimilarTagPrompt.vue'
 import AIReclassifyModal from '../components/ui/AIReclassifyModal.vue'
 import CreateTransactionModal from '../components/ui/CreateTransactionModal.vue'
 import ImportOFXModal from '../components/ui/ImportOFXModal.vue'
+import TransactionDetailsModal from '../components/ui/TransactionDetailsModal.vue'
+import { type Transaction } from '../stores/transactions'
 import { 
   PhArrowDownRight, 
   PhArrowUpRight, 
@@ -24,9 +27,11 @@ import {
   PhCreditCard, 
   PhX, 
   PhCheck, 
-  PhArrowsCounterClockwise 
+  PhArrowsCounterClockwise,
+  PhPencilSimple
 } from '@phosphor-icons/vue'
 
+const authStore = useAuthStore()
 const store = useTransactionsStore()
 const tagsStore = useTagsStore()
 const accountsStore = useAccountsStore()
@@ -43,6 +48,31 @@ const aiResultCount = ref<number | null>(null)
 
 const isCreateModalOpen = ref(false)
 const isImportModalOpen = ref(false)
+
+// Modal de Detalhes / Edição de Transação
+const selectedTxForDetails = ref<Transaction | null>(null)
+const isDetailsModalOpen = ref(false)
+
+const openTransactionDetails = (tx: Transaction) => {
+  selectedTxForDetails.value = tx
+  isDetailsModalOpen.value = true
+}
+
+const closeTransactionDetails = () => {
+  isDetailsModalOpen.value = false
+  selectedTxForDetails.value = null
+}
+
+const onTransactionUpdated = (updatedTx: Transaction) => {
+  const idx = store.transactions.findIndex(t => t.id === updatedTx.id)
+  if (idx !== -1) {
+    store.transactions[idx] = { ...store.transactions[idx], ...updatedTx }
+  }
+}
+
+const onTransactionDeleted = (txId: string) => {
+  store.transactions = store.transactions.filter(t => t.id !== txId)
+}
 
 // Prompt de Propagação de Tags Semelhantes
 const similarPrompt = ref<{
@@ -78,6 +108,7 @@ const periodLabels: Record<PeriodPreset, string> = {
 }
 
 onMounted(async () => {
+  if (!authStore.isAuthenticated) return
   await Promise.all([
     store.fetchTransactions(),
     tagsStore.fetchTags(),
@@ -85,13 +116,26 @@ onMounted(async () => {
     accountsStore.fetchAccounts()
   ])
   window.addEventListener('click', onWindowClick)
+  window.addEventListener('scroll', onWindowScroll, true)
 })
 
 onUnmounted(() => {
   window.removeEventListener('click', onWindowClick)
+  window.removeEventListener('scroll', onWindowScroll, true)
 })
 
 const onWindowClick = () => {
+  closeCategoryDropdown()
+  isAccountsMenuOpen.value = false
+  isTagsMenuOpen.value = false
+  isPeriodMenuOpen.value = false
+}
+
+const onWindowScroll = (e: Event) => {
+  const target = e.target as HTMLElement
+  if (target && (target.closest?.('.category-combobox-container') || target.classList?.contains('category-combobox-container'))) {
+    return
+  }
   closeCategoryDropdown()
   isAccountsMenuOpen.value = false
   isTagsMenuOpen.value = false
@@ -115,18 +159,28 @@ const setFilterTab = (tab: 'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED') 
 
   if (tab === 'ALL') {
     store.filters.type = ''
+    store.filters.amount_min = undefined
+    store.filters.amount_max = undefined
     store.filters.status = ''
   } else if (tab === 'DEBIT') {
-    store.filters.type = 'DEBIT'
+    store.filters.type = ''
+    store.filters.amount_min = undefined
+    store.filters.amount_max = -0.01
     store.filters.status = ''
   } else if (tab === 'CREDIT') {
-    store.filters.type = 'CREDIT'
+    store.filters.type = ''
+    store.filters.amount_min = 0.01
+    store.filters.amount_max = undefined
     store.filters.status = ''
   } else if (tab === 'UNTAGGED') {
     store.filters.type = ''
+    store.filters.amount_min = undefined
+    store.filters.amount_max = undefined
     store.filters.status = 'UNTAGGED'
   } else if (tab === 'PLANNED') {
     store.filters.type = ''
+    store.filters.amount_min = undefined
+    store.filters.amount_max = undefined
     store.filters.status = 'PLANNED'
   }
 
@@ -267,18 +321,15 @@ const toggleCategoryDropdown = (txId: string, event: Event) => {
     isPeriodMenuOpen.value = false
 
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    const scrollTop = window.scrollY || document.documentElement.scrollTop
-    const scrollLeft = window.scrollX || document.documentElement.scrollLeft
-
     const dropdownHeight = 320
     const windowHeight = window.innerHeight
     const opensUpward = rect.bottom + dropdownHeight > windowHeight && rect.top - dropdownHeight > 0
 
     dropdownPosition.value = {
-      left: Math.min(rect.left + scrollLeft, window.innerWidth - 340) + 'px',
+      left: Math.max(12, Math.min(rect.left, window.innerWidth - 340)) + 'px',
       top: (opensUpward 
-        ? (rect.top + scrollTop - dropdownHeight - 6) 
-        : (rect.bottom + scrollTop + 6)) + 'px',
+        ? (rect.top - dropdownHeight - 6) 
+        : (rect.bottom + 6)) + 'px',
     }
   }
 }
@@ -384,6 +435,10 @@ const formatDate = (dateString: string) => {
 
 const formatCurrency = (val: number) => {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val)
+}
+
+const isCredit = (t: Transaction) => {
+  return t.amount > 0
 }
 </script>
 
@@ -681,19 +736,20 @@ const formatCurrency = (val: number) => {
           <div 
             v-for="t in store.transactions" 
             :key="t.id"
-            class="p-4 flex flex-col gap-2.5 active:bg-white/5 transition-colors"
+            class="p-4 flex flex-col gap-2.5 active:bg-white/5 transition-colors cursor-pointer group"
+            @click="openTransactionDetails(t)"
           >
             <div class="flex items-start justify-between gap-3">
-              <div class="flex items-start gap-3 min-w-0">
+              <div class="flex items-start gap-3 min-w-0 flex-1">
                 <div 
                   class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                  :class="t.type === 'CREDIT' ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
+                  :class="isCredit(t) ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
                 >
-                  <PhArrowUpRight v-if="t.type === 'CREDIT'" :size="20" weight="bold" />
+                  <PhArrowUpRight v-if="isCredit(t)" :size="20" weight="bold" />
                   <PhArrowDownRight v-else :size="20" weight="bold" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="text-sm font-bold text-white truncate">{{ t.name || 'Sem nome' }}</div>
+                  <div class="text-sm font-bold text-white truncate group-hover:text-accent transition-colors">{{ t.name || 'Sem nome' }}</div>
                   <div class="text-xs text-white/40 truncate">{{ t.memo || getAccountById(t.account_id)?.name || 'Extrato' }}</div>
                 </div>
               </div>
@@ -702,9 +758,9 @@ const formatCurrency = (val: number) => {
               <div class="text-right flex-shrink-0">
                 <div 
                   class="text-sm font-bold whitespace-nowrap"
-                  :class="t.type === 'CREDIT' ? 'text-accent' : 'text-white'"
+                  :class="isCredit(t) ? 'text-accent' : 'text-white'"
                 >
-                  {{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}
+                  {{ isCredit(t) ? '+' : '' }}{{ formatCurrency(t.amount) }}
                 </div>
                 <div class="text-[10px] text-white/40 mt-0.5">
                   {{ formatDate(t.date_posted) }}
@@ -713,7 +769,7 @@ const formatCurrency = (val: number) => {
             </div>
 
             <!-- Rodapé do Card Mobile: Categoria, Conta e Badges -->
-            <div class="flex items-center justify-between pt-1">
+            <div class="flex items-center justify-between pt-1" @click.stop>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <!-- Seletor de Categoria Principal -->
                 <button
@@ -759,7 +815,7 @@ const formatCurrency = (val: number) => {
                 class="p-1.5 rounded-lg text-white/30 hover:text-red-400 active:text-red-400 transition-colors cursor-pointer"
                 title="Excluir"
               >
-                <PhTrash :size="16" />
+                <PhTrash :size="15" />
               </button>
             </div>
           </div>
@@ -783,17 +839,17 @@ const formatCurrency = (val: number) => {
               :key="'desk-' + t.id" 
               class="hover:bg-white/[0.03] transition-colors group"
             >
-              <td class="p-4">
+              <td class="p-4 cursor-pointer" @click="openTransactionDetails(t)">
                 <div class="flex items-center gap-3">
                   <div 
                     class="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    :class="t.type === 'CREDIT' ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
+                    :class="isCredit(t) ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
                   >
-                    <PhArrowUpRight v-if="t.type === 'CREDIT'" :size="18" weight="bold" />
+                    <PhArrowUpRight v-if="isCredit(t)" :size="18" weight="bold" />
                     <PhArrowDownRight v-else :size="18" weight="bold" />
                   </div>
                   <div class="min-w-0 max-w-sm">
-                    <div class="font-bold text-white truncate" :title="t.name">{{ t.name || 'Sem nome' }}</div>
+                    <div class="font-bold text-white truncate hover:text-accent transition-colors" :title="t.name">{{ t.name || 'Sem nome' }}</div>
                     <div class="text-[11px] text-white/40 truncate" :title="t.memo">{{ t.memo || 'Sem observações' }}</div>
                   </div>
                 </div>
@@ -847,21 +903,31 @@ const formatCurrency = (val: number) => {
                 <span class="truncate">{{ getAccountById(t.account_id)?.name || 'Conta' }}</span>
               </td>
 
-              <td class="p-4 text-right font-bold whitespace-nowrap" :class="t.type === 'CREDIT' ? 'text-accent' : 'text-white'">
-                <div>{{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}</div>
+              <td class="p-4 text-right font-bold whitespace-nowrap" :class="isCredit(t) ? 'text-accent' : 'text-white'">
+                <div>{{ isCredit(t) ? '+' : '' }}{{ formatCurrency(t.amount) }}</div>
                 <div v-if="t.status === 'PLANNED'" class="text-[10px] text-amber-400 font-medium">Prevista</div>
                 <div v-else-if="t.status === 'RECONCILED'" class="text-[10px] text-blue-400 font-medium">Conciliada</div>
               </td>
 
-              <td class="p-4 text-center">
-                <button
-                  type="button"
-                  @click="handleDelete(t.id)"
-                  class="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
-                  title="Excluir"
-                >
-                  <PhTrash :size="16" />
-                </button>
+              <td class="p-4 text-center" @click.stop>
+                <div class="flex items-center justify-center gap-1">
+                  <button
+                    type="button"
+                    @click="openTransactionDetails(t)"
+                    class="p-1.5 rounded-lg text-white/30 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                    title="Ver detalhes completos / Editar"
+                  >
+                    <PhPencilSimple :size="15" />
+                  </button>
+                  <button
+                    type="button"
+                    @click="handleDelete(t.id)"
+                    class="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
+                    title="Excluir"
+                  >
+                    <PhTrash :size="15" />
+                  </button>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -892,25 +958,56 @@ const formatCurrency = (val: number) => {
       </div>
     </div>
 
-    <!-- Dropdown Teleportado do Seletor de Categoria com Mais Usadas e Busca -->
+    <!-- Seletor de Categoria com Mais Usadas e Busca -->
     <Teleport to="body">
-      <div 
-        v-if="activeDropdownTxId" 
-        :style="{
-          position: 'absolute',
-          left: dropdownPosition.left,
-          top: dropdownPosition.top,
-          zIndex: 10005,
-        }"
-        @click.stop
-      >
-        <CategoryCombobox
-          :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
-          :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
-          @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
-          @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
-          @close="closeCategoryDropdown"
-        />
+      <div v-if="activeDropdownTxId">
+        <!-- Mobile: Bottom Sheet com Backdrop -->
+        <div 
+          class="fixed inset-0 z-[10000] bg-black/75 backdrop-blur-xs flex items-end md:hidden animate-in fade-in duration-150"
+          @click="closeCategoryDropdown"
+        >
+          <div 
+            class="w-full bg-surface border-t border-white/10 rounded-t-3xl p-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 category-combobox-container"
+            @click.stop
+          >
+            <div class="w-12 h-1 bg-white/20 rounded-full mx-auto mb-3"></div>
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
+              <span class="text-xs font-bold text-white">Classificar Transação</span>
+              <button 
+                type="button" 
+                @click="closeCategoryDropdown" 
+                class="text-white/40 hover:text-white p-1 cursor-pointer"
+              >
+                <PhX :size="16" />
+              </button>
+            </div>
+            <CategoryCombobox
+              :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
+              :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
+              @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
+              @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
+              @close="closeCategoryDropdown"
+            />
+          </div>
+        </div>
+
+        <!-- Desktop: Dropdown Flutuante Posicionado com Auto-Dismiss no Scroll -->
+        <div 
+          class="hidden md:block fixed z-[10005] category-combobox-container"
+          :style="{
+            left: dropdownPosition.left,
+            top: dropdownPosition.top,
+          }"
+          @click.stop
+        >
+          <CategoryCombobox
+            :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
+            :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
+            @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
+            @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
+            @close="closeCategoryDropdown"
+          />
+        </div>
       </div>
     </Teleport>
 
@@ -945,6 +1042,15 @@ const formatCurrency = (val: number) => {
       :is-open="isImportModalOpen"
       @close="isImportModalOpen = false"
       @imported="store.fetchTransactions()"
+    />
+
+    <!-- Modal de Detalhes e Edição da Transação (Mobile & Desktop) -->
+    <TransactionDetailsModal
+      :is-open="isDetailsModalOpen"
+      :transaction="selectedTxForDetails"
+      @close="closeTransactionDetails"
+      @updated="onTransactionUpdated"
+      @deleted="onTransactionDeleted"
     />
   </div>
 </template>

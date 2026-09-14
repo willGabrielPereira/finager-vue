@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia';
+import { defineStore } from 'pinia';
 import { api } from '../api/axios';
 
 export interface Transaction {
@@ -39,6 +39,8 @@ export const useTransactionsStore = defineStore('transactions', {
       tags: [] as string[],
       date_from: '',
       date_to: '',
+      amount_min: undefined as number | string | undefined,
+      amount_max: undefined as number | string | undefined,
     },
     loading: false,
   }),
@@ -53,6 +55,8 @@ export const useTransactionsStore = defineStore('transactions', {
           search: params.search !== undefined ? params.search : this.filters.search,
           status: params.status !== undefined ? params.status : this.filters.status,
           type: params.type !== undefined ? params.type : this.filters.type,
+          amount_min: params.amount_min !== undefined ? params.amount_min : this.filters.amount_min,
+          amount_max: params.amount_max !== undefined ? params.amount_max : this.filters.amount_max,
           date_from: params.date_from !== undefined ? params.date_from : this.filters.date_from,
           date_to: params.date_to !== undefined ? params.date_to : this.filters.date_to,
         };
@@ -100,6 +104,8 @@ export const useTransactionsStore = defineStore('transactions', {
       this.filters.tags = [];
       this.filters.date_from = '';
       this.filters.date_to = '';
+      this.filters.amount_min = undefined;
+      this.filters.amount_max = undefined;
       this.pagination.page = 1;
     },
 
@@ -118,6 +124,15 @@ export const useTransactionsStore = defineStore('transactions', {
         if (tx) tx.tags = originalTags;
         throw err;
       }
+    },
+
+    async updateTransaction(txId: string, payload: Record<string, any>) {
+      const { data } = await api.put('/transactions/' + txId, payload);
+      const idx = this.transactions.findIndex((t) => t.id === txId);
+      if (idx !== -1) {
+        this.transactions[idx] = { ...this.transactions[idx], ...(data || payload) };
+      }
+      return data;
     },
 
     async createTransaction(payload: any) {

@@ -12,7 +12,7 @@ const authStore = useAuthStore()
 const router = useRouter()
 
 onMounted(() => {
-  if (!authStore.user) {
+  if (!authStore.user && authStore.isAuthenticated) {
     authStore.fetchMe()
   }
 })

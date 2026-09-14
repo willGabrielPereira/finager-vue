@@ -110,7 +110,7 @@ const handleCreateTag = async () => {
 
 <template>
   <div 
-    class="w-80 rounded-2xl border border-white/10 bg-slate-950/95 backdrop-blur-xl p-3 shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-3 text-white"
+    class="w-full md:w-80 rounded-2xl md:border md:border-white/10 bg-transparent md:bg-slate-950/95 md:backdrop-blur-xl p-1 md:p-3 md:shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col gap-3 text-white"
     @click.stop
   >
     <!-- Seção: Mais Usadas Recentemente (1 Toque) -->

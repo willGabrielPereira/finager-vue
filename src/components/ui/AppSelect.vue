@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Multiselect from '@vueform/multiselect'
-import { computed } from 'vue'
+import { computed, ref, onMounted, onBeforeUnmount } from 'vue'
 import { PhCaretDown, PhX } from '@phosphor-icons/vue'
 
 export interface AppSelectOption {
@@ -91,11 +91,33 @@ const getValuesCount = (values: any): number => {
   if (values && typeof values === 'object') return Object.keys(values).length
   return 0
 }
+
+const msRef = ref<any>(null)
+
+const onWindowScroll = (e: Event) => {
+  if (msRef.value && msRef.value.isOpen) {
+    const target = e.target as HTMLElement
+    // Ignore scrolling within the options dropdown itself
+    if (target && (target.closest?.('.multiselect-dropdown') || target.classList?.contains('multiselect-dropdown'))) {
+      return
+    }
+    msRef.value.close()
+  }
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', onWindowScroll, true)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('scroll', onWindowScroll, true)
+})
 </script>
 
 <template>
   <div class="w-full finager-select" :class="[`finager-select-${size}`]">
     <Multiselect
+      ref="msRef"
       :model-value="modelValue"
       :options="normalizedOptions"
       :mode="mode"
