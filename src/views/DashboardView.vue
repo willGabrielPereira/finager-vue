@@ -119,8 +119,8 @@ const loadDashboardData = async () => {
     return `${y}-${m}-${day}`
   }
 
-  const params: Record<string, any> = {
-    limit: 100,
+  const params: { date_from: string; date_to: string; accounts?: string; limit?: number } = {
+    limit: 500,
     date_from: formatDateISO(firstDay),
     date_to: formatDateISO(lastDay),
   }
@@ -130,7 +130,7 @@ const loadDashboardData = async () => {
   }
 
   try {
-    await txStore.fetchTransactions(params)
+    await txStore.fetchDashboardTransactions(params)
   } catch (err) {
     console.warn('Erro ao buscar transações do dashboard:', err)
   }
@@ -160,22 +160,109 @@ const isCredit = (t: any) => {
   return t.amount > 0
 }
 
-// Métricas de Caixa do Mês Selecionado
-const totalIncome = computed(() => {
-  return txStore.transactions
-    .filter(t => isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer)
-    .reduce((acc, t) => acc + Math.abs(t.amount), 0)
+// Transações ativas no período (não planejadas)
+const activeTransactions = computed(() => {
+  return txStore.dashboardTransactions.filter(t => t.status !== 'PLANNED')
 })
 
-const totalExpenses = computed(() => {
-  return txStore.transactions
-    .filter(t => !isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer)
-    .reduce((acc, t) => acc + Math.abs(t.amount), 0)
+// Consolidação financeira por categoria com compensação entre débitos e créditos.
+// Para qualquer categoria no período, entradas (créditos) e saídas (débitos) se abatem:
+// despesa líquida = max(0, débitos - créditos)
+// receita líquida = max(0, créditos - débitos)
+const categoryBreakdown = computed(() => {
+  const map: Record<string, {
+    tagId?: string
+    name: string
+    color: string
+    debits: number
+    credits: number
+  }> = {}
+
+  let untaggedDebits = 0
+  let untaggedCredits = 0
+
+  for (const t of activeTransactions.value) {
+    if (t.is_transfer) continue
+
+    const tagId = t.tags?.[0]
+    const tag = tagId ? getTagById(tagId) : null
+    const amount = Math.abs(t.amount)
+
+    if (!tag) {
+      if (isCredit(t)) {
+        untaggedCredits += amount
+      } else {
+        untaggedDebits += amount
+      }
+      continue
+    }
+
+    if (!map[tag.id]) {
+      map[tag.id] = {
+        tagId: tag.id,
+        name: tag.name,
+        color: tag.color || '#64748b',
+        debits: 0,
+        credits: 0,
+      }
+    }
+
+    if (isCredit(t)) {
+      map[tag.id].credits += amount
+    } else {
+      map[tag.id].debits += amount
+    }
+  }
+
+  let totalExpensesCalc = untaggedDebits
+  let totalIncomeCalc = untaggedCredits
+  let totalAbated = 0
+
+  const expenseCategories: Record<string, { total: number; color: string; name: string }> = {}
+
+  for (const cat of Object.values(map)) {
+    const abatedAmount = Math.min(cat.debits, cat.credits)
+    totalAbated += abatedAmount
+
+    const netExpense = Math.max(0, cat.debits - cat.credits)
+    const netIncome = Math.max(0, cat.credits - cat.debits)
+
+    totalExpensesCalc += netExpense
+    totalIncomeCalc += netIncome
+
+    if (netExpense > 0) {
+      expenseCategories[cat.name] = {
+        total: netExpense,
+        color: cat.color,
+        name: cat.name,
+      }
+    }
+  }
+
+  if (untaggedDebits > 0) {
+    expenseCategories['Sem Categoria'] = {
+      total: untaggedDebits,
+      color: '#64748b',
+      name: 'Sem Categoria',
+    }
+  }
+
+  return {
+    totalExpenses: totalExpensesCalc,
+    totalIncome: totalIncomeCalc,
+    totalAbated,
+    expenseCategories,
+  }
 })
+
+// Métricas de Caixa do Mês Selecionado
+const totalIncome = computed(() => categoryBreakdown.value.totalIncome)
+const totalExpenses = computed(() => categoryBreakdown.value.totalExpenses)
+const totalAbated = computed(() => categoryBreakdown.value.totalAbated)
 
 const totalPlanned = computed(() => {
-  return txStore.transactions
-    .filter(t => !isCredit(t) && t.status === 'PLANNED')
+  return txStore.dashboardTransactions
+    .filter(t => !isCredit(t) && t.status === 'PLANNED' && !t.is_transfer)
     .reduce((acc, t) => acc + Math.abs(t.amount), 0)
 })
 
@@ -188,30 +275,15 @@ const projectedBalance = computed(() => {
 })
 
 const recentTransactions = computed(() => {
-  return txStore.transactions.slice(0, 7)
+  return txStore.dashboardTransactions.slice(0, 7)
 })
 
 // Dados do Gráfico de Rosca por Categoria
 const chartData = computed(() => {
-  const categoryTotals: Record<string, { total: number; color: string; name: string }> = {}
-
-  for (const t of txStore.transactions) {
-    if (!isCredit(t) && t.status !== 'PLANNED' && !t.is_transfer) {
-      const tagId = t.tags?.[0]
-      const tag = tagId ? getTagById(tagId) : null
-      const name = tag?.name || 'Sem Categoria'
-      const color = tag?.color || '#64748b'
-
-      if (!categoryTotals[name]) {
-        categoryTotals[name] = { total: 0, color, name }
-      }
-      categoryTotals[name].total += Math.abs(t.amount)
-    }
-  }
-
-  const labels = Object.values(categoryTotals).map(c => c.name)
-  const data = Object.values(categoryTotals).map(c => c.total)
-  const backgroundColor = Object.values(categoryTotals).map(c => c.color)
+  const categories = categoryBreakdown.value.expenseCategories
+  const labels = Object.values(categories).map(c => c.name)
+  const data = Object.values(categories).map(c => c.total)
+  const backgroundColor = Object.values(categories).map(c => c.color)
 
   return {
     labels,
@@ -262,9 +334,9 @@ const formatDate = (dateString: string) => {
         <p class="text-xs text-white/50">Fluxo de caixa e despesas consolidadas da família</p>
       </div>
 
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
-        <!-- Seletor de Conta com Componente Padronizado -->
-        <div class="w-full sm:w-64 shrink-0">
+      <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 w-full md:w-auto">
+        <!-- 1. Seletor de Conta com Componente Padronizado -->
+        <div class="w-full md:w-60 lg:w-64 shrink-0">
           <AppSelect
             v-model="selectedAccountId"
             :options="accountOptions"
@@ -273,52 +345,49 @@ const formatDate = (dateString: string) => {
           />
         </div>
 
-        <!-- Grupo: Navegador de Mês / Ano e Atalhos -->
-        <div class="flex items-center gap-2 shrink-0">
-          <!-- Navegador de Mês / Ano -->
-          <div class="flex items-center bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10">
-            <button
-              type="button"
-              @click="prevMonth"
-              class="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-              title="Mês Anterior"
-            >
-              <PhCaretLeft :size="15" weight="bold" />
-            </button>
+        <!-- 2. Navegador de Mês / Ano -->
+        <div class="flex items-center justify-between md:justify-center bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 w-full md:w-auto">
+          <button
+            type="button"
+            @click="prevMonth"
+            class="p-2 sm:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            title="Mês Anterior"
+          >
+            <PhCaretLeft :size="15" weight="bold" />
+          </button>
 
-            <span class="px-2 text-xs font-bold text-white min-w-[145px] text-center select-none shrink-0 truncate">
-              {{ monthDisplay }}
-            </span>
+          <span class="px-2 text-xs font-bold text-white text-center select-none truncate flex-1 md:flex-none md:min-w-[145px]">
+            {{ monthDisplay }}
+          </span>
 
-            <button
-              type="button"
-              @click="nextMonth"
-              class="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-              title="Próximo Mês"
-            >
-              <PhCaretRight :size="15" weight="bold" />
-            </button>
-          </div>
+          <button
+            type="button"
+            @click="nextMonth"
+            class="p-2 sm:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            title="Próximo Mês"
+          >
+            <PhCaretRight :size="15" weight="bold" />
+          </button>
+        </div>
 
-          <!-- Atalhos rápidos de Mês -->
-          <div class="inline-flex bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 items-center">
-            <button
-              type="button"
-              @click="goToPrevMonth"
-              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none whitespace-nowrap shrink-0"
-              :class="isPrevMonth ? 'bg-accent/20 text-accent font-bold shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Mês Passado
-            </button>
-            <button
-              type="button"
-              @click="goToCurrentMonth"
-              class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none whitespace-nowrap shrink-0"
-              :class="isCurrentMonth ? 'bg-accent/20 text-accent font-bold shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Mês Atual
-            </button>
-          </div>
+        <!-- 3. Atalhos rápidos de Mês -->
+        <div class="grid grid-cols-2 md:inline-flex bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 items-center w-full md:w-auto">
+          <button
+            type="button"
+            @click="goToPrevMonth"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none whitespace-nowrap text-center flex items-center justify-center"
+            :class="isPrevMonth ? 'bg-accent/20 text-accent font-bold shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Mês Passado
+          </button>
+          <button
+            type="button"
+            @click="goToCurrentMonth"
+            class="px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer select-none whitespace-nowrap text-center flex items-center justify-center"
+            :class="isCurrentMonth ? 'bg-accent/20 text-accent font-bold shadow-sm' : 'text-white/60 hover:text-white hover:bg-white/5'"
+          >
+            Mês Atual
+          </button>
         </div>
       </div>
     </div>
@@ -353,7 +422,12 @@ const formatDate = (dateString: string) => {
           <span class="text-2xl font-bold tracking-tight text-red-400">
             {{ formatCurrency(totalExpenses) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">Gastos efetivados no período</p>
+          <p class="text-[11px] text-white/40 mt-1">
+            <span v-if="totalAbated > 0" class="text-accent/80 font-medium">
+              {{ formatCurrency(totalAbated) }} compensados
+            </span>
+            <span v-else>Gastos efetivados no período</span>
+          </p>
         </div>
       </div>
 
@@ -409,7 +483,7 @@ const formatDate = (dateString: string) => {
         </div>
 
         <div class="relative h-64 flex items-center justify-center">
-          <div v-if="txStore.loading" class="text-xs text-white/40">Carregando dados...</div>
+          <div v-if="txStore.dashboardLoading" class="text-xs text-white/40">Carregando dados...</div>
           <div v-else-if="chartData.labels.length === 0" class="text-center text-white/40 text-xs flex flex-col gap-2">
             <span>Nenhuma despesa registrada neste mês.</span>
           </div>
@@ -435,7 +509,7 @@ const formatDate = (dateString: string) => {
           </div>
 
           <!-- Lista de Lançamentos -->
-          <div v-if="txStore.loading" class="py-12 text-center text-xs text-white/40">
+          <div v-if="txStore.dashboardLoading" class="py-12 text-center text-xs text-white/40">
             Carregando transações...
           </div>
           <div v-else-if="recentTransactions.length === 0" class="py-12 text-center flex flex-col items-center gap-2">
@@ -457,9 +531,9 @@ const formatDate = (dateString: string) => {
               <div class="flex items-center gap-3 min-w-0">
                 <div 
                   class="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  :class="t.type === 'CREDIT' ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
+                  :class="isCredit(t) ? 'bg-accent/15 text-accent' : 'bg-red-500/15 text-red-400'"
                 >
-                  <PhArrowUpRight v-if="t.type === 'CREDIT'" :size="16" weight="bold" />
+                  <PhArrowUpRight v-if="isCredit(t)" :size="16" weight="bold" />
                   <PhArrowDownRight v-else :size="16" weight="bold" />
                 </div>
                 <div class="min-w-0">
@@ -483,9 +557,9 @@ const formatDate = (dateString: string) => {
               <div class="text-right shrink-0">
                 <span 
                   class="text-xs font-bold"
-                  :class="t.type === 'CREDIT' ? 'text-accent' : 'text-white'"
+                  :class="isCredit(t) ? 'text-accent' : 'text-white'"
                 >
-                  {{ t.type === 'CREDIT' ? '+' : '' }}{{ formatCurrency(t.amount) }}
+                  {{ isCredit(t) ? '+' : '' }}{{ formatCurrency(t.amount) }}
                 </span>
                 <span 
                   v-if="t.status === 'PLANNED'"

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useTagsStore, type Tag } from '../stores/tags'
-import { api } from '../api/axios'
+import { toast, showAlert } from '../utils/feedback'
 import { 
   PhTag, 
   PhPlus, 
   PhTrash, 
+  PhPencilSimple,
+  PhLock,
   PhX, 
   PhCheck, 
   PhCircleNotch,
@@ -15,8 +17,11 @@ import {
 const tagsStore = useTagsStore()
 
 const isModalOpen = ref(false)
-const newTagName = ref('')
-const newTagColor = ref('#22c55e')
+const modalMode = ref<'create' | 'edit'>('create')
+const editingTagId = ref<string | null>(null)
+const formTagName = ref('')
+const formTagColor = ref('#22c55e')
+const formError = ref('')
 const saving = ref(false)
 const searchQuery = ref('')
 const deletingTagId = ref<string | null>(null)
@@ -37,21 +42,53 @@ const filteredTags = computed(() => {
   return tagsStore.tags.filter(t => t.name.toLowerCase().includes(q))
 })
 
-const handleCreate = async () => {
-  if (!newTagName.value.trim()) return
+const openCreateModal = () => {
+  modalMode.value = 'create'
+  editingTagId.value = null
+  formTagName.value = ''
+  formTagColor.value = '#22c55e'
+  formError.value = ''
+  isModalOpen.value = true
+}
+
+const openEditModal = (tag: Tag) => {
+  if (tag.is_system) return
+  modalMode.value = 'edit'
+  editingTagId.value = tag.id
+  formTagName.value = tag.name
+  formTagColor.value = tag.color || '#22c55e'
+  formError.value = ''
+  isModalOpen.value = true
+}
+
+const handleSubmit = async () => {
+  const name = formTagName.value.trim()
+  if (!name || name.length < 2) {
+    formError.value = 'O nome da categoria deve ter pelo menos 2 caracteres.'
+    return
+  }
 
   saving.value = true
+  formError.value = ''
+
   try {
-    await tagsStore.createTag({
-      name: newTagName.value.trim(),
-      color: newTagColor.value,
-      icon: 'tag'
-    })
-    newTagName.value = ''
+    if (modalMode.value === 'create') {
+      await tagsStore.createTag({
+        name,
+        color: formTagColor.value,
+        icon: 'tag'
+      })
+    } else if (editingTagId.value) {
+      await tagsStore.updateTag(editingTagId.value, {
+        name,
+        color: formTagColor.value,
+        icon: 'tag'
+      })
+    }
     isModalOpen.value = false
-  } catch (err) {
-    console.error('Falha ao criar tag:', err)
-    alert('Erro ao criar categoria.')
+  } catch (err: any) {
+    console.error('Falha ao salvar tag:', err)
+    formError.value = err.response?.data?.message || err.response?.data?.error || 'Erro ao salvar categoria.'
   } finally {
     saving.value = false
   }
@@ -59,19 +96,26 @@ const handleCreate = async () => {
 
 const handleDelete = async (tag: Tag) => {
   if (tag.is_system) {
-    alert('Tags de sistema são fixas e não podem ser removidas.')
+    toast.warning('Ação não permitida', 'Tags de sistema são fixas e não podem ser removidas.')
     return
   }
 
-  if (!confirm('Deseja realmente excluir a tag "' + tag.name + '"?')) return
+  const confirmed = await showAlert.confirm({
+    title: `Excluir a tag "${tag.name}"?`,
+    text: 'Esta tag será removida das categorias personalizadas.',
+    confirmText: 'Sim, excluir',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
 
   deletingTagId.value = tag.id
   try {
-    await api.delete('/tags/' + tag.id)
-    tagsStore.tags = tagsStore.tags.filter(t => t.id !== tag.id)
+    await tagsStore.deleteTag(tag.id)
+    toast.success('Tag excluída com sucesso.')
   } catch (err) {
     console.error('Falha ao excluir tag:', err)
-    alert('Erro ao excluir tag.')
+    toast.error('Erro ao excluir', 'Não foi possível excluir a tag.')
   } finally {
     deletingTagId.value = null
   }
@@ -90,7 +134,7 @@ const handleDelete = async (tag: Tag) => {
       <div class="flex items-center gap-3">
         <button
           type="button"
-          @click="isModalOpen = true"
+          @click="openCreateModal"
           class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20 hover:scale-105 active:scale-95"
         >
           <PhPlus :size="16" weight="bold" />
@@ -121,10 +165,12 @@ const handleDelete = async (tag: Tag) => {
         v-for="tag in filteredTags"
         :key="tag.id"
         class="bg-surface p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-all flex items-center justify-between group shadow-sm"
+        :class="{ 'cursor-pointer hover:bg-white/[0.02]': !tag.is_system }"
+        @click="!tag.is_system && openEditModal(tag)"
       >
-        <div class="flex items-center gap-3 min-w-0">
+        <div class="flex items-center gap-3 min-w-0 flex-1 pr-2">
           <div 
-            class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+            class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-transform group-hover:scale-105"
             :style="{ backgroundColor: (tag.color || '#10b981') + '20', color: tag.color || '#10b981' }"
           >
             <PhTag :size="20" weight="duotone" />
@@ -137,21 +183,43 @@ const handleDelete = async (tag: Tag) => {
           </div>
         </div>
 
-        <button
-          v-if="!tag.is_system"
-          type="button"
-          @click="handleDelete(tag)"
-          :disabled="deletingTagId === tag.id"
-          class="p-2 rounded-lg text-white/30 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
-          title="Excluir tag"
-        >
-          <PhCircleNotch v-if="deletingTagId === tag.id" :size="16" class="animate-spin" />
-          <PhTrash v-else :size="16" />
-        </button>
+        <!-- Ações do Card -->
+        <div class="flex items-center gap-1 shrink-0" @click.stop>
+          <!-- Indicador de Tag de Sistema Fixa -->
+          <span
+            v-if="tag.is_system"
+            class="p-1.5 text-white/20 hover:text-white/40 transition-colors"
+            title="Categoria nativa do sistema (somente leitura)"
+          >
+            <PhLock :size="16" />
+          </span>
+
+          <!-- Botões de Ação para Tags Customizadas -->
+          <template v-else>
+            <button
+              type="button"
+              @click="openEditModal(tag)"
+              class="p-2 rounded-lg text-white/40 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+              title="Editar categoria"
+            >
+              <PhPencilSimple :size="16" />
+            </button>
+            <button
+              type="button"
+              @click="handleDelete(tag)"
+              :disabled="deletingTagId === tag.id"
+              class="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
+              title="Excluir categoria"
+            >
+              <PhCircleNotch v-if="deletingTagId === tag.id" :size="16" class="animate-spin" />
+              <PhTrash v-else :size="16" />
+            </button>
+          </template>
+        </div>
       </div>
     </div>
 
-    <!-- Modal: Nova Tag -->
+    <!-- Modal: Criar / Editar Tag -->
     <div
       v-if="isModalOpen"
       class="fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
@@ -163,23 +231,49 @@ const handleDelete = async (tag: Tag) => {
       >
         <button
           @click="isModalOpen = false"
-          class="absolute top-4 right-4 text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5"
+          class="absolute top-4 right-4 text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
+          title="Fechar"
         >
           <PhX :size="20" />
         </button>
 
         <div>
-          <h3 class="text-lg font-bold">Nova Categoria</h3>
-          <p class="text-xs text-white/50">Crie uma tag para organizar seus gastos</p>
+          <h3 class="text-lg font-bold">
+            {{ modalMode === 'create' ? 'Nova Categoria' : 'Editar Categoria' }}
+          </h3>
+          <p class="text-xs text-white/50">
+            {{ modalMode === 'create' ? 'Crie uma tag para organizar seus gastos' : 'Altere o nome e a cor de identificação' }}
+          </p>
+        </div>
+
+        <!-- Live Preview do Badge -->
+        <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+          <div 
+            class="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 transition-colors"
+            :style="{ backgroundColor: formTagColor + '20', color: formTagColor }"
+          >
+            <PhTag :size="20" weight="duotone" />
+          </div>
+          <div class="min-w-0">
+            <span class="text-xs font-bold text-white truncate block">
+              {{ formTagName.trim() || 'Nome da Categoria' }}
+            </span>
+            <span class="text-[10px] text-white/40 font-medium">Pré-visualização</span>
+          </div>
+        </div>
+
+        <div v-if="formError" class="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+          {{ formError }}
         </div>
 
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-white/70">Nome da Categoria</label>
           <input
-            v-model="newTagName"
+            v-model="formTagName"
             type="text"
             placeholder="Ex: Assinaturas, Hobbies..."
             class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-accent"
+            @keydown.enter="handleSubmit"
           />
         </div>
 
@@ -190,12 +284,25 @@ const handleDelete = async (tag: Tag) => {
               v-for="color in defaultColors"
               :key="color"
               type="button"
-              @click="newTagColor = color"
-              class="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 cursor-pointer"
+              @click="formTagColor = color"
+              class="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 cursor-pointer relative"
               :style="{ backgroundColor: color }"
             >
-              <PhCheck v-if="newTagColor === color" :size="14" class="text-white" weight="bold" />
+              <PhCheck v-if="formTagColor === color" :size="14" class="text-white" weight="bold" />
             </button>
+
+            <!-- Seletor de Cor Customizada -->
+            <label 
+              class="w-6 h-6 rounded-full flex items-center justify-center cursor-pointer border border-dashed border-white/30 hover:border-white/60 transition-colors overflow-hidden relative"
+              title="Escolher cor personalizada"
+            >
+              <input
+                type="color"
+                v-model="formTagColor"
+                class="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+              />
+              <span class="text-[9px] font-bold text-white/60">+</span>
+            </label>
           </div>
         </div>
 
@@ -209,13 +316,14 @@ const handleDelete = async (tag: Tag) => {
           </button>
           <button
             type="button"
-            @click="handleCreate"
-            :disabled="saving || !newTagName.trim()"
+            @click="handleSubmit"
+            :disabled="saving || !formTagName.trim()"
             class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
           >
             <PhCircleNotch v-if="saving" :size="16" class="animate-spin" />
+            <PhCheck v-else-if="modalMode === 'edit'" :size="16" weight="bold" />
             <PhPlus v-else :size="16" weight="bold" />
-            <span>{{ saving ? 'Salvando...' : 'Salvar Categoria' }}</span>
+            <span>{{ saving ? 'Salvando...' : (modalMode === 'edit' ? 'Salvar Alterações' : 'Salvar Categoria') }}</span>
           </button>
         </div>
       </div>

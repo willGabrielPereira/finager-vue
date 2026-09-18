@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { type Transaction, useTransactionsStore } from '../../stores/transactions'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
+import CurrencyInput from './CurrencyInput.vue'
+import CategorySelect from './CategorySelect.vue'
+import { toast, showAlert } from '../../utils/feedback'
 import { 
   PhX, 
   PhArrowUpRight, 
@@ -46,6 +49,47 @@ const deleteLoading = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
 
+// Gesto de fechar no mobile (drag-to-dismiss)
+const translateY = ref(0)
+const isDragging = ref(false)
+let startY = 0
+
+const onTouchStart = (e: TouchEvent) => {
+  if (window.innerWidth >= 640) return
+  startY = e.touches[0].clientY
+  isDragging.value = true
+}
+
+const onTouchMove = (e: TouchEvent) => {
+  if (!isDragging.value) return
+  const currentY = e.touches[0].clientY
+  const deltaY = currentY - startY
+  if (deltaY > 0) {
+    translateY.value = deltaY
+    if (e.cancelable) e.preventDefault()
+  } else {
+    translateY.value = 0
+  }
+}
+
+const onTouchEnd = () => {
+  if (!isDragging.value) return
+  isDragging.value = false
+  if (translateY.value > 80) {
+    emit('close')
+  }
+  translateY.value = 0
+}
+
+onMounted(() => {
+  if (tagsStore.tags.length === 0) {
+    tagsStore.fetchTags()
+  }
+  if (accountsStore.accounts.length === 0) {
+    accountsStore.fetchAccounts()
+  }
+})
+
 // Preenche o formulário quando a transação mudar
 watch(
   () => props.transaction,
@@ -67,6 +111,7 @@ watch(
 
       errorMessage.value = ''
       successMessage.value = ''
+      translateY.value = 0
     }
   },
   { immediate: true }
@@ -80,17 +125,6 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
     icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
   }))
-})
-
-const tagOptions = computed<AppSelectOption[]>(() => {
-  return [
-    { value: '', label: 'Sem Categoria' },
-    ...tagsStore.tags.map(t => ({
-      value: t.id,
-      label: t.name,
-      color: t.color || '#10b981'
-    }))
-  ]
 })
 
 const formatDatePretty = (isoStr: string) => {
@@ -147,16 +181,24 @@ const handleSave = async () => {
 
 const handleDelete = async () => {
   if (!props.transaction) return
-  if (!confirm('Deseja realmente excluir esta transação?')) return
+  const confirmed = await showAlert.confirm({
+    title: 'Excluir transação?',
+    text: 'Esta ação não poderá ser desfeita.',
+    confirmText: 'Sim, excluir',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
 
   deleteLoading.value = true
   try {
     await txStore.deleteTransaction(props.transaction.id)
+    toast.success('Transação excluída com sucesso.')
     emit('deleted', props.transaction.id)
     emit('close')
   } catch (err: any) {
     console.error('Erro ao excluir:', err)
-    alert(err.response?.data?.message || 'Falha ao excluir transação.')
+    toast.error('Erro ao excluir', err.response?.data?.message || 'Falha ao excluir transação.')
   } finally {
     deleteLoading.value = false
   }
@@ -166,18 +208,34 @@ const handleDelete = async () => {
 <template>
   <div 
     v-if="isOpen && transaction"
-    class="fixed inset-0 z-[10002] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200 overflow-y-auto"
+    class="fixed inset-0 z-[10002] bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center sm:justify-center p-0 sm:p-4 animate-in fade-in duration-200 overflow-y-auto overscroll-contain"
     @click="emit('close')"
   >
     <div 
-      class="w-full sm:max-w-lg bg-surface border border-white/10 rounded-t-3xl sm:rounded-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 text-white my-0 sm:my-auto"
+      class="w-full sm:max-w-lg bg-surface border border-white/10 rounded-t-3xl sm:rounded-2xl max-h-[92dvh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 text-white my-0 sm:my-auto overscroll-contain will-change-transform"
+      :style="{
+        transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,
+        transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+      }"
       @click.stop
     >
-      <!-- Barra Mobile Drag indicator -->
-      <div class="w-12 h-1 bg-white/20 rounded-full mx-auto mt-3 sm:hidden"></div>
+      <!-- Barra Mobile Drag indicator com suporte a arrastar para fechar -->
+      <div 
+        class="w-full pt-3 pb-1 cursor-grab active:cursor-grabbing sm:hidden touch-none flex justify-center"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+      >
+        <div class="w-12 h-1.5 bg-white/25 hover:bg-white/40 rounded-full transition-colors"></div>
+      </div>
 
-      <!-- Cabeçalho -->
-      <div class="px-5 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0">
+      <!-- Cabeçalho (arrastável no mobile) -->
+      <div 
+        class="px-5 py-3.5 border-b border-white/10 flex items-center justify-between shrink-0 touch-none sm:touch-auto select-none"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+      >
         <div class="flex items-center gap-2.5 min-w-0">
           <div 
             class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0"
@@ -232,19 +290,13 @@ const handleDelete = async () => {
           </button>
         </div>
 
-        <!-- Campo: Valor -->
+        <!-- Campo: Valor com Máscara Monetária -->
         <div class="flex flex-col gap-1">
           <label class="text-xs font-semibold text-white/70">Valor</label>
-          <div class="relative">
-            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/40">R$</span>
-            <input
-              v-model="amount"
-              type="number"
-              step="0.01"
-              placeholder="0,00"
-              class="w-full bg-slate-950 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xl font-bold text-white placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
+          <CurrencyInput
+            v-model="amount"
+            placeholder="0,00"
+          />
         </div>
 
         <!-- Campo: Nome / Descrição Completa -->
@@ -284,17 +336,16 @@ const handleDelete = async () => {
               :options="accountOptions"
               placeholder="Selecione..."
               size="sm"
+              :teleport="true"
             />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <AppSelect
+            <CategorySelect
               v-model="selectedTagId"
-              :options="tagOptions"
               placeholder="Sem Categoria"
               size="sm"
-              :clearable="true"
             />
           </div>
 

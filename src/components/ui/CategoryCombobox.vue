@@ -182,10 +182,10 @@ const handleCreateTag = async () => {
         <div class="text-[10px] text-white/40 px-2 mb-1">Criar como nova tag:</div>
         <div class="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-accent/10 border border-accent/20">
           <span class="w-3 h-3 rounded-full flex-shrink-0" :style="{ backgroundColor: newTagColor }"></span>
-          <span class="text-xs font-semibold text-accent truncate flex-1">"{{ searchQuery.trim() }}"</span>
-          <div class="flex gap-1">
+          <span class="text-xs font-semibold text-accent truncate flex-1 min-w-0">"{{ searchQuery.trim() }}"</span>
+          <div class="flex gap-1 shrink-0">
             <span 
-              v-for="color in defaultColors.slice(0, 4)" 
+              v-for="color in defaultColors.slice(0, 6)" 
               :key="color"
               @click.stop="newTagColor = color"
               class="w-3.5 h-3.5 rounded-full cursor-pointer transition-transform hover:scale-110"
@@ -197,9 +197,9 @@ const handleCreateTag = async () => {
             type="button"
             @click="handleCreateTag"
             :disabled="isCreating"
-            class="px-2 py-1 rounded bg-accent text-bg font-bold text-[10px] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            class="px-2.5 py-1 rounded bg-accent text-bg font-bold text-[10px] hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shrink-0"
           >
-            Criar
+            {{ isCreating ? 'Criando...' : 'Criar' }}
           </button>
         </div>
       </div>

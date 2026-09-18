@@ -130,6 +130,7 @@ onBeforeUnmount(() => {
       :close-on-select="mode === 'single' ? closeOnSelect : false"
       :no-results-text="noResultsText"
       :no-options-text="noOptionsText"
+      :append-to-body="teleport"
       @update:model-value="onUpdate"
       @select="(val, opt) => emit('select', val, opt)"
       @deselect="(val, opt) => emit('deselect', val, opt)"
@@ -176,27 +177,23 @@ onBeforeUnmount(() => {
 
       <!-- Slot do valor selecionado em modo single -->
       <template #singlelabel="{ value }">
-        <div class="flex items-center gap-2 max-w-full overflow-hidden">
-          <component 
-            v-if="value.icon" 
-            :is="value.icon" 
-            :size="15" 
-            class="shrink-0 text-white/80" 
-          />
-          <span 
-            v-else-if="value.color" 
-            class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
-            :style="{ backgroundColor: value.color }"
-          />
-          <span class="text-xs sm:text-[13px] font-medium text-white truncate">
-            {{ value.label }}
-          </span>
-          <span 
-            v-if="value.badge" 
-            class="shrink-0 ml-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-white/10 text-white/70"
-          >
-            {{ value.badge }}
-          </span>
+        <div class="multiselect-single-label">
+          <div class="flex items-center gap-2 max-w-full overflow-hidden">
+            <component 
+              v-if="value.icon" 
+              :is="value.icon" 
+              :size="15" 
+              class="shrink-0 text-white/80" 
+            />
+            <span 
+              v-else-if="value.color" 
+              class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+              :style="{ backgroundColor: value.color }"
+            />
+            <span class="text-xs sm:text-[13px] font-medium text-white truncate">
+              {{ value.label }}
+            </span>
+          </div>
         </div>
       </template>
 

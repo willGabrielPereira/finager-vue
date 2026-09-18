@@ -43,9 +43,29 @@ export const useTransactionsStore = defineStore('transactions', {
       amount_max: undefined as number | string | undefined,
     },
     loading: false,
+    dashboardTransactions: [] as Transaction[],
+    dashboardLoading: false,
   }),
 
   actions: {
+    async fetchDashboardTransactions(params: { date_from: string; date_to: string; accounts?: string; limit?: number }) {
+      this.dashboardLoading = true;
+      try {
+        const queryParams: Record<string, any> = {
+          date_from: params.date_from,
+          date_to: params.date_to,
+          limit: params.limit ?? 500,
+        };
+        if (params.accounts && params.accounts !== 'ALL') {
+          queryParams.accounts = params.accounts;
+        }
+        const { data } = await api.get('/transactions', { params: queryParams });
+        this.dashboardTransactions = data.data || [];
+        return this.dashboardTransactions;
+      } finally {
+        this.dashboardLoading = false;
+      }
+    },
     async fetchTransactions(params: Record<string, any> = {}) {
       this.loading = true;
       try {
@@ -118,10 +138,18 @@ export const useTransactionsStore = defineStore('transactions', {
         tx.manually_tagged = true;
       }
 
+      const dTx = this.dashboardTransactions.find((t) => t.id === txId);
+      const originalDTags = dTx ? [...(dTx.tags || [])] : [];
+      if (dTx) {
+        dTx.tags = tagIds;
+        dTx.manually_tagged = true;
+      }
+
       try {
         await api.put('/transactions/' + txId, { tags: tagIds });
       } catch (err) {
         if (tx) tx.tags = originalTags;
+        if (dTx) dTx.tags = originalDTags;
         throw err;
       }
     },
@@ -132,12 +160,17 @@ export const useTransactionsStore = defineStore('transactions', {
       if (idx !== -1) {
         this.transactions[idx] = { ...this.transactions[idx], ...(data || payload) };
       }
+      const dIdx = this.dashboardTransactions.findIndex((t) => t.id === txId);
+      if (dIdx !== -1) {
+        this.dashboardTransactions[dIdx] = { ...this.dashboardTransactions[dIdx], ...(data || payload) };
+      }
       return data;
     },
 
     async createTransaction(payload: any) {
       const { data } = await api.post('/transactions', payload);
       this.transactions.unshift(data);
+      this.dashboardTransactions.unshift(data);
       this.pagination.total++;
       return data;
     },
@@ -145,6 +178,7 @@ export const useTransactionsStore = defineStore('transactions', {
     async deleteTransaction(txId: string) {
       await api.delete('/transactions/' + txId);
       this.transactions = this.transactions.filter((t) => t.id !== txId);
+      this.dashboardTransactions = this.dashboardTransactions.filter((t) => t.id !== txId);
       this.pagination.total--;
     },
 

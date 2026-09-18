@@ -3,6 +3,8 @@ import { createApp } from 'vue';
 import { createPinia } from 'pinia';
 import './style.css';
 import './assets/multiselect.css';
+import 'sweetalert2/dist/sweetalert2.min.css';
+import './assets/swal.css';
 import App from './App.vue';
 import router from './router';
 

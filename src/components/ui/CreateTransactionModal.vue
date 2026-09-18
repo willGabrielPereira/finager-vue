@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
+import CurrencyInput from './CurrencyInput.vue'
+import CategorySelect from './CategorySelect.vue'
 import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
@@ -31,6 +33,38 @@ const datePosted = ref(new Date().toISOString().split('T')[0])
 const loading = ref(false)
 const errorMessage = ref('')
 
+// Gesto de fechar no mobile (drag-to-dismiss)
+const translateY = ref(0)
+const isDragging = ref(false)
+let startY = 0
+
+const onTouchStart = (e: TouchEvent) => {
+  if (window.innerWidth >= 640) return
+  startY = e.touches[0].clientY
+  isDragging.value = true
+}
+
+const onTouchMove = (e: TouchEvent) => {
+  if (!isDragging.value) return
+  const currentY = e.touches[0].clientY
+  const deltaY = currentY - startY
+  if (deltaY > 0) {
+    translateY.value = deltaY
+    if (e.cancelable) e.preventDefault()
+  } else {
+    translateY.value = 0
+  }
+}
+
+const onTouchEnd = () => {
+  if (!isDragging.value) return
+  isDragging.value = false
+  if (translateY.value > 80) {
+    emit('close')
+  }
+  translateY.value = 0
+}
+
 const accountOptions = computed<AppSelectOption[]>(() => {
   return accountsStore.accounts.map(acc => ({
     value: acc.id,
@@ -39,17 +73,6 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
     icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
   }))
-})
-
-const tagOptions = computed<AppSelectOption[]>(() => {
-  return [
-    { value: '', label: 'Sem Categoria' },
-    ...tagsStore.tags.map(t => ({
-      value: t.id,
-      label: t.name,
-      color: t.color || '#10b981'
-    }))
-  ]
 })
 
 
@@ -111,15 +134,34 @@ const submit = async () => {
 <template>
   <div 
     v-if="isOpen"
-    class="fixed inset-0 z-[10002] flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
+    class="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto overscroll-contain"
     @click="emit('close')"
   >
     <div 
-      class="bg-surface border border-white/10 rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 text-white my-auto"
+      class="bg-surface border border-white/10 rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 text-white my-0 sm:my-auto overscroll-contain will-change-transform"
+      :style="{
+        transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,
+        transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
+      }"
       @click.stop
     >
-      <!-- Cabeçalho Fixo -->
-      <div class="px-5 py-4 border-b border-white/10 flex items-center justify-between flex-shrink-0">
+      <!-- Barra Mobile Drag indicator com suporte a toque -->
+      <div 
+        class="w-full pt-3 pb-1 cursor-grab active:cursor-grabbing sm:hidden touch-none flex justify-center"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+      >
+        <div class="w-12 h-1.5 bg-white/25 hover:bg-white/40 rounded-full transition-colors"></div>
+      </div>
+
+      <!-- Cabeçalho Fixo (arrastável no mobile) -->
+      <div 
+        class="px-5 py-3.5 border-b border-white/10 flex items-center justify-between flex-shrink-0 touch-none sm:touch-auto select-none"
+        @touchstart="onTouchStart"
+        @touchmove="onTouchMove"
+        @touchend="onTouchEnd"
+      >
         <div>
           <h3 class="text-base sm:text-lg font-bold text-white">Novo Lançamento</h3>
           <p class="text-[11px] text-white/50">Crie uma despesa ou receita avulsa</p>
@@ -159,19 +201,13 @@ const submit = async () => {
           </button>
         </div>
 
-        <!-- Valor -->
+        <!-- Valor com Máscara Monetária -->
         <div class="flex flex-col gap-1">
           <label class="text-xs font-semibold text-white/70">Valor</label>
-          <div class="relative">
-            <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/40">R$</span>
-            <input
-              v-model="amount"
-              type="number"
-              step="0.01"
-              placeholder="0,00"
-              class="w-full bg-slate-950 border border-white/10 rounded-xl pl-11 pr-4 py-2.5 text-xl font-bold text-white placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
-            />
-          </div>
+          <CurrencyInput
+            v-model="amount"
+            placeholder="0,00"
+          />
         </div>
 
         <!-- Nome e Observação -->
@@ -210,12 +246,10 @@ const submit = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <AppSelect
+            <CategorySelect
               v-model="selectedTagId"
-              :options="tagOptions"
               placeholder="Sem Categoria"
-              :clearable="true"
-              :teleport="true"
+              size="md"
             />
           </div>
 

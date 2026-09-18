@@ -11,6 +11,7 @@ import AIReclassifyModal from '../components/ui/AIReclassifyModal.vue'
 import CreateTransactionModal from '../components/ui/CreateTransactionModal.vue'
 import ImportOFXModal from '../components/ui/ImportOFXModal.vue'
 import TransactionDetailsModal from '../components/ui/TransactionDetailsModal.vue'
+import { toast, showAlert } from '../utils/feedback'
 import { type Transaction } from '../stores/transactions'
 import { 
   PhArrowDownRight, 
@@ -389,11 +390,17 @@ const handleApplySimilar = async () => {
   similarPrompt.value.loading = true
   try {
     const res = await store.applySimilar(similarPrompt.value.txId, false)
+    const count = res?.updated_count ?? 0
     similarPrompt.value = null
-    alert('Sucesso! A categoria foi aplicada a ' + (res?.updated_count ?? 0) + ' transações semelhantes.')
+    toast.success(
+      'Atualização em massa concluída!',
+      count === 1
+        ? 'A categoria foi aplicada a 1 transação semelhante.'
+        : `A categoria foi aplicada a ${count} transações semelhantes.`
+    )
   } catch (err: any) {
     console.error('Falha ao propagar tags:', err)
-    alert(err.response?.data?.message || 'Falha ao propagar tags.')
+    toast.error('Erro na propagação', err.response?.data?.message || 'Falha ao propagar categoria.')
   } finally {
     if (similarPrompt.value) similarPrompt.value.loading = false
   }
@@ -406,7 +413,7 @@ const handleConfirmAI = async (includeManuallyTagged: boolean) => {
     aiResultCount.value = res.tagged_count
   } catch (err: any) {
     console.error('Erro na IA:', err)
-    alert(err.response?.data?.message || 'Falha ao rodar classificação com IA.')
+    toast.error('Erro na IA', err.response?.data?.message || 'Falha ao rodar classificação com IA.')
   } finally {
     isAIModalLoading.value = false
   }
@@ -418,12 +425,21 @@ const closeAIModal = () => {
 }
 
 const handleDelete = async (txId: string) => {
-  if (!confirm('Deseja realmente excluir este lançamento?')) return
+  const confirmed = await showAlert.confirm({
+    title: 'Excluir lançamento?',
+    text: 'Esta ação removerá a transação permanentemente.',
+    confirmText: 'Sim, excluir',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
+
   try {
     await store.deleteTransaction(txId)
+    toast.success('Transação excluída com sucesso.')
   } catch (err) {
     console.error('Falha ao deletar:', err)
-    alert('Erro ao excluir transação.')
+    toast.error('Erro ao excluir', 'Não foi possível excluir a transação.')
   }
 }
 
@@ -749,7 +765,7 @@ const isCredit = (t: Transaction) => {
                   <PhArrowDownRight v-else :size="20" weight="bold" />
                 </div>
                 <div class="min-w-0 flex-1">
-                  <div class="text-sm font-bold text-white truncate group-hover:text-accent transition-colors">{{ t.name || 'Sem nome' }}</div>
+                  <div class="text-sm font-bold text-white truncate group-hover:text-accent transition-colors">{{ t.name || t.memo || 'Sem nome' }}</div>
                   <div class="text-xs text-white/40 truncate">{{ t.memo || getAccountById(t.account_id)?.name || 'Extrato' }}</div>
                 </div>
               </div>
@@ -849,7 +865,7 @@ const isCredit = (t: Transaction) => {
                     <PhArrowDownRight v-else :size="18" weight="bold" />
                   </div>
                   <div class="min-w-0 max-w-sm">
-                    <div class="font-bold text-white truncate hover:text-accent transition-colors" :title="t.name">{{ t.name || 'Sem nome' }}</div>
+                    <div class="font-bold text-white truncate hover:text-accent transition-colors" :title="t.name || t.memo">{{ t.name || t.memo || 'Sem nome' }}</div>
                     <div class="text-[11px] text-white/40 truncate" :title="t.memo">{{ t.memo || 'Sem observações' }}</div>
                   </div>
                 </div>

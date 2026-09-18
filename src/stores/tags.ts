@@ -53,5 +53,34 @@ export const useTagsStore = defineStore('tags', {
       this.tags.push(data);
       return data;
     },
+
+    async updateTag(id: string, payload: { name?: string; color?: string; icon?: string }) {
+      await api.put(`/tags/${id}`, payload);
+      const index = this.tags.findIndex(t => t.id === id);
+      if (index !== -1) {
+        this.tags[index] = {
+          ...this.tags[index],
+          ...(payload.name !== undefined ? { name: payload.name } : {}),
+          ...(payload.color !== undefined ? { color: payload.color } : {}),
+          ...(payload.icon !== undefined ? { icon: payload.icon } : {}),
+        };
+      }
+      const freqIndex = this.frequentTags.findIndex(t => t.id === id);
+      if (freqIndex !== -1) {
+        this.frequentTags[freqIndex] = {
+          ...this.frequentTags[freqIndex],
+          ...(payload.name !== undefined ? { name: payload.name } : {}),
+          ...(payload.color !== undefined ? { color: payload.color } : {}),
+          ...(payload.icon !== undefined ? { icon: payload.icon } : {}),
+        };
+      }
+      return this.tags[index];
+    },
+
+    async deleteTag(id: string) {
+      await api.delete(`/tags/${id}`);
+      this.tags = this.tags.filter(t => t.id !== id);
+      this.frequentTags = this.frequentTags.filter(t => t.id !== id);
+    },
   },
 });
