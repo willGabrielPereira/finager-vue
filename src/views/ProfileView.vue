@@ -1,7 +1,10 @@
 ﻿<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { showAlert, toast } from '../utils/feedback'
+import DeleteAccountModal from '../components/ui/DeleteAccountModal.vue'
 import { useAuthStore } from '../stores/auth'
+import { useBillingStore } from '../stores/billing'
 import { 
   PhUser, 
   PhHouse, 
@@ -19,11 +22,15 @@ import {
   PhTrash,
   PhArrowRight,
   PhEnvelopeSimple,
+  PhCrown,
+  PhLightning,
+  PhRocketLaunch,
   PhShieldCheck,
   PhX
 } from '@phosphor-icons/vue'
 
 const authStore = useAuthStore()
+const billingStore = useBillingStore()
 const router = useRouter()
 
 // Profile Form
@@ -56,10 +63,16 @@ const joinLoading = ref(false)
 const joinError = ref('')
 const joinSuccess = ref('')
 
+const isDeleteModalOpen = ref(false)
+const openDeleteAccountModal = () => {
+  isDeleteModalOpen.value = true
+}
+
 onMounted(async () => {
   await Promise.all([
     authStore.fetchMe(),
-    authStore.fetchFamilyMembers()
+    authStore.fetchFamilyMembers(),
+    billingStore.fetchPlan()
   ])
   if (authStore.user) {
     login.value = authStore.user.login || ''
@@ -193,21 +206,35 @@ const handleJoinFamily = async () => {
 }
 
 const handleRemoveMember = async (memberId: string, memberLogin: string) => {
-  if (!confirm(`Deseja realmente remover o usuário "${memberLogin}" da sua família? Ele perderá acesso às contas e dados compartilhados.`)) {
-    return
-  }
+  const confirmed = await showAlert.confirm({
+    title: 'Remover membro da família?',
+    text: `Deseja realmente remover o usuário "${memberLogin}" da sua família? Ele perderá acesso às contas e dados compartilhados.`,
+    confirmText: 'Sim, remover',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
+
   try {
     await authStore.removeMember(memberId)
+    toast.success('Membro removido com sucesso.')
   } catch (err: any) {
-    alert(err.response?.data?.error || 'Falha ao remover membro.')
+    toast.error('Erro ao remover membro', err.response?.data?.error || err.response?.data?.message || 'Falha ao remover membro.')
   }
 }
 
 const handleLogout = async () => {
-  if (confirm('Deseja realmente sair da sua conta?')) {
-    await authStore.logout()
-    router.push('/login')
-  }
+  const confirmed = await showAlert.confirm({
+    title: 'Deseja realmente sair?',
+    text: 'Você precisará fazer login novamente para acessar suas finanças.',
+    confirmText: 'Sair da conta',
+    cancelText: 'Permanecer',
+    isDestructive: false,
+  })
+  if (!confirmed) return
+
+  await authStore.logout()
+  router.push('/login')
 }
 
 const formatDate = (dateStr?: string) => {
@@ -270,12 +297,68 @@ const formatDate = (dateStr?: string) => {
       </router-link>
     </div>
 
+    
+    <!-- Card Resumo do Plano & Quotas -->
+    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
+      <div class="flex items-start sm:items-center gap-4 z-10">
+        <div 
+          class="w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0"
+          :class="billingStore.isPro 
+            ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400 shadow-lg shadow-emerald-500/10' 
+            : 'bg-accent/15 border-accent/30 text-accent'"
+        >
+          <component :is="billingStore.isPro ? PhCrown : PhLightning" :size="22" weight="duotone" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-semibold text-white/50">Plano Atual</span>
+            <span 
+              class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider"
+              :class="billingStore.isPro 
+                ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
+                : 'bg-white/10 text-white/80 border-white/15'"
+            >
+              {{ billingStore.isPro ? 'Plano Pro' : 'Plano Free' }}
+            </span>
+          </div>
+          <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-white/70">
+            <span>
+              Contas: <strong>{{ billingStore.accountsUsed }}/{{ billingStore.isAccountsUnlimited ? '∞' : billingStore.accountsLimit }}</strong>
+            </span>
+            <span class="text-white/20">•</span>
+            <span>
+              Membros: <strong>{{ billingStore.membersUsed }}/{{ billingStore.membersLimit }}</strong>
+            </span>
+            <span class="text-white/20">•</span>
+            <span>
+              Histórico: <strong>{{ billingStore.isHistoryUnlimited ? 'Ilimitado' : '90 dias' }}</strong>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <router-link
+        to="/billing"
+        class="z-10 inline-flex items-center justify-center gap-2 py-2 px-4 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md self-stretch sm:self-auto"
+        :class="billingStore.isPro 
+          ? 'bg-white/10 hover:bg-white/15 text-white border border-white/10' 
+          : 'bg-accent text-bg hover:opacity-90 shadow-accent/15'"
+      >
+        <component :is="billingStore.isPro ? PhCrown : PhRocketLaunch" :size="15" weight="bold" />
+        <span>{{ billingStore.isPro ? 'Gerenciar Plano' : 'Fazer Upgrade para Pro' }}</span>
+        <PhArrowRight :size="13" />
+      </router-link>
+    </div>
+
     <!-- Seção Membros da Família & Convite Seguro -->
     <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
       <div class="flex items-center justify-between pb-2 border-b border-white/5">
         <div class="flex items-center gap-2">
           <PhUsers :size="20" class="text-accent" weight="duotone" />
-          <h3 class="text-sm font-bold text-white">Membros da Família Compartilhada</h3>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <span>Membros da Família Compartilhada</span>
+            <span class="text-xs text-white/40 font-normal">({{ billingStore.membersUsed }}/{{ billingStore.isMembersUnlimited ? '∞' : billingStore.membersLimit }})</span>
+          </h3>
         </div>
 
         <button
@@ -468,6 +551,27 @@ const formatDate = (dateStr?: string) => {
       </div>
     </div>
 
+        <!-- Zona de Privacidade e Direitos LGPD -->
+    <div class="bg-surface rounded-2xl p-6 border border-red-500/20 shadow-xl flex flex-col gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-sm font-bold text-red-400 flex items-center gap-2">
+            <PhTrash :size="18" />
+            <span>Eliminação de Conta e Dados (LGPD Art. 18)</span>
+          </h3>
+          <p class="text-xs text-white/50 mt-1 max-w-2xl leading-relaxed">
+            Em conformidade com a Lei Geral de Proteção de Dados, você tem o direito de excluir permanentemente seus acessos, contas bancárias, extratos e histórico financeiro.
+          </p>
+        </div>
+        <button
+          type="button"
+          @click="openDeleteAccountModal"
+          class="shrink-0 px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 text-xs font-bold transition-all cursor-pointer">
+          <span>Excluir Minha Conta</span>
+        </button>
+      </div>
+    </div>
+
     <!-- Modal de Convite Seguro -->
     <div
       v-if="isInviteModalOpen"
@@ -577,5 +681,6 @@ const formatDate = (dateStr?: string) => {
         </div>
       </div>
     </div>
+    <DeleteAccountModal :is-open="isDeleteModalOpen" @close="isDeleteModalOpen = false" />
   </div>
 </template>

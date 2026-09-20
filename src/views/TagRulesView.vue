@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/axios'
 import { useTagsStore } from '../stores/tags'
+import { showAlert, toast } from '../utils/feedback'
 import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
 import { 
   PhListDashes, 
@@ -101,12 +102,22 @@ const handleCreateRule = async () => {
 }
 
 const handleDeleteRule = async (id: string) => {
-  if (!confirm('Deseja excluir esta regra de estabelecimento?')) return
+  const confirmed = await showAlert.confirm({
+    title: 'Excluir regra de estabelecimento?',
+    text: 'Lançamentos futuros com este padrão não serão mais categorizados automaticamente por esta regra.',
+    confirmText: 'Sim, excluir',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
+
   try {
     await api.delete(`/merchant-rules/${id}`)
     rules.value = rules.value.filter(r => r.id !== id)
-  } catch (err) {
+    toast.success('Regra excluída com sucesso.')
+  } catch (err: any) {
     console.error('Falha ao excluir regra', err)
+    toast.error('Erro ao excluir regra', err?.response?.data?.message || err?.response?.data?.error || 'Não foi possível excluir a regra.')
   }
 }
 </script>

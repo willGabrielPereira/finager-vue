@@ -12,6 +12,7 @@ const router = createRouter({
     { path: '/import', component: () => import('../views/ImportView.vue') },
     { path: '/tags', component: () => import('../views/TagsView.vue') },
     { path: '/profile', component: () => import('../views/ProfileView.vue') },
+    { path: '/billing', component: () => import('../views/BillingView.vue') },
     { path: '/tag-rules', component: () => import('../views/TagRulesView.vue') },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]

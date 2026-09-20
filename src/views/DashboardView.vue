@@ -1,9 +1,16 @@
-<script setup lang="ts">
+﻿<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
+import { inject } from 'vue'
+import { useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
+import OnboardingChecklist from '../components/ui/OnboardingChecklist.vue'
+
+const router = useRouter()
+const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
+const openImport = inject<() => void>('openImport')
 import { 
   PhWallet, 
   PhTrendUp, 
@@ -327,6 +334,12 @@ const formatDate = (dateString: string) => {
 
 <template>
   <div class="flex flex-col gap-6">
+    <!-- Checklist de Onboarding / Primeiros Passos -->
+    <OnboardingChecklist 
+      @open-ofx-guide="openOFXGuide?.()"
+      @open-new-account="router.push('/accounts')"
+      @open-import-ofx="openImport?.()"
+    />
     <!-- Header & Barra de Controles de Período -->
     <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
       <div class="shrink-0">
@@ -345,7 +358,7 @@ const formatDate = (dateString: string) => {
           />
         </div>
 
-        <!-- 2. Navegador de Mês / Ano -->
+        <!-- 2. Navegador de Mês / Anão -->
         <div class="flex items-center justify-between md:justify-center bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 w-full md:w-auto">
           <button
             type="button"
@@ -393,9 +406,9 @@ const formatDate = (dateString: string) => {
     </div>
 
     <!-- Bento Grid de Métricas Financeiras -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div data-tour="kpi-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Card: Receitas -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <div data-tour="kpi-card-primary" class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Receitas em {{ monthNames[selectedMonth] }}</span>
           <div class="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
@@ -446,7 +459,7 @@ const formatDate = (dateString: string) => {
           >
             {{ formatCurrency(netBalance) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">Receitas menos despesas</p>
+          <p class="text-[11px] text-white/40 mt-1">Receitas menãos despesas</p>
         </div>
       </div>
 

@@ -1,7 +1,10 @@
 ﻿<script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, inject } from 'vue'
 import { useAccountsStore, type Account } from '../stores/accounts'
 import { useAuthStore } from '../stores/auth'
+import { useBillingStore } from '../stores/billing'
+import { useRouter } from 'vue-router'
+import { showAlert, toast } from '../utils/feedback'
 import { 
   PhBank, 
   PhPlus, 
@@ -14,11 +17,19 @@ import {
   PhChartLineUp, 
   PhCheck, 
   PhX, 
-  PhWarningCircle 
+  PhWarningCircle,
+  PhFileText,
+  PhCrown,
+  PhLightning,
+  PhRocketLaunch,
+  PhArrowRight
 } from '@phosphor-icons/vue'
 
 const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
+const billingStore = useBillingStore()
+const router = useRouter()
+const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
@@ -46,7 +57,10 @@ const popularBanks = [
 ]
 
 onMounted(async () => {
-  await accountsStore.fetchAccounts()
+  await Promise.all([
+    accountsStore.fetchAccounts(),
+    billingStore.fetchPlan()
+  ])
 })
 
 const sharedAccountsCount = computed(() => {
@@ -57,7 +71,21 @@ const privateAccountsCount = computed(() => {
   return accountsStore.accounts.filter(a => a.allowed_users && a.allowed_users.length > 0).length
 })
 
-const openCreateModal = () => {
+const openCreateModal = async () => {
+  if (billingStore.isAccountsLimitReached) {
+    const goToBilling = await showAlert.confirm({
+      title: 'Limite de Contas Atingido',
+      text: 'O plano gratuito permite até 2 contas bancárias cadastradas. Deseja fazer upgrade para o plano Pro para conectar contas ilimitadas?',
+      confirmText: 'Ver Planos & Upgrade',
+      cancelText: 'Voltar',
+      isDestructive: false,
+    })
+    if (goToBilling) {
+      router.push('/billing')
+    }
+    return
+  }
+
   isEditing.value = false
   editingId.value = null
   form.value = {
@@ -113,6 +141,7 @@ const handleSave = async () => {
     }
 
     closeModal()
+    await billingStore.fetchPlan()
   } catch (err: any) {
     formError.value = err.response?.data?.message || err.response?.data?.error || 'Falha ao salvar conta bancária.'
   } finally {
@@ -121,14 +150,21 @@ const handleSave = async () => {
 }
 
 const handleDelete = async (acc: Account) => {
-  if (!confirm(`Deseja realmente excluir a conta "${acc.name}"? Todas as transações vinculadas a ela poderão ser afetadas.`)) {
-    return
-  }
+  const confirmed = await showAlert.confirm({
+    title: `Excluir a conta "${acc.name}"?`,
+    text: 'Todas as transações vinculadas a ela poderão ser afetadas.',
+    confirmText: 'Sim, excluir',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
 
   try {
     await accountsStore.deleteAccount(acc.id)
+    toast.success('Conta bancária excluída com sucesso.')
+    await billingStore.fetchPlan()
   } catch (err: any) {
-    alert(err.response?.data?.message || err.response?.data?.error || 'Falha ao excluir conta.')
+    toast.error('Erro ao excluir conta', err.response?.data?.message || err.response?.data?.error || 'Falha ao excluir conta.')
   }
 }
 
@@ -154,7 +190,7 @@ const getTypeBadgeClass = (type?: string) => {
 <template>
   <div class="max-w-5xl mx-auto flex flex-col gap-6">
     <!-- Header -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div data-tour="accounts-header" class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
           <PhBank :size="26" class="text-accent" weight="duotone" />
@@ -173,6 +209,67 @@ const getTypeBadgeClass = (type?: string) => {
         <PhPlus :size="16" weight="bold" />
         <span>Nova Conta</span>
       </button>
+    </div>
+
+    
+    <!-- Banner de Quota do Plano -->
+    <div 
+      class="p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm transition-all"
+      :class="billingStore.isAccountsLimitReached 
+        ? 'bg-rose-500/10 border-rose-500/25' 
+        : billingStore.isPro 
+          ? 'bg-emerald-500/10 border-emerald-500/20' 
+          : 'bg-surface border-white/5'"
+    >
+      <div class="flex items-center gap-3">
+        <div 
+          class="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border"
+          :class="billingStore.isAccountsLimitReached 
+            ? 'bg-rose-500/20 border-rose-500/30 text-rose-300' 
+            : billingStore.isPro 
+              ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-400' 
+              : 'bg-accent/15 border-accent/30 text-accent'"
+        >
+          <component :is="billingStore.isPro ? PhCrown : PhLightning" :size="18" weight="duotone" />
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-bold text-white">
+              {{ billingStore.isPro ? 'Plano Pro Ativo' : 'Cota de Contas (Plano Free)' }}
+            </span>
+            <span 
+              class="text-[10px] font-semibold px-2 py-0.2 rounded-full border"
+              :class="billingStore.isAccountsLimitReached 
+                ? 'bg-rose-500/20 text-rose-300 border-rose-500/30' 
+                : 'bg-white/10 text-white/70 border-white/15'"
+            >
+              <template v-if="billingStore.isAccountsUnlimited">Contas Ilimitadas</template>
+              <template v-else>{{ billingStore.accountsUsed }}/{{ billingStore.accountsLimit }} cadastradas</template>
+            </span>
+          </div>
+          <p class="text-[11px] text-white/50 mt-0.5">
+            <template v-if="billingStore.isAccountsUnlimited">
+              Você pode conectar quantas contas, cartões e carteiras desejar.
+            </template>
+            <template v-else-if="billingStore.isAccountsLimitReached">
+              Limite de 2 contas atingido. Desbloqueie contas ilimitadas com o Plano Pro.
+            </template>
+            <template v-else>
+              O plano gratuito permite até 2 contas conectadas na família.
+            </template>
+          </p>
+        </div>
+      </div>
+
+      <router-link
+        v-if="!billingStore.isPro"
+        to="/billing"
+        class="inline-flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-sm shadow-accent/15 self-start sm:self-center"
+      >
+        <PhRocketLaunch :size="14" weight="bold" />
+        <span>{{ billingStore.isAccountsLimitReached ? 'Desbloquear no Pro' : 'Ver Planos' }}</span>
+        <PhArrowRight :size="12" />
+      </router-link>
     </div>
 
     <!-- Cards Resumo -->
@@ -352,6 +449,22 @@ const getTypeBadgeClass = (type?: string) => {
               class="w-full bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
               required
             />
+            <!-- Dica Contextual Guia OFX -->
+            <div 
+              class="mt-2.5 p-2.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center justify-between gap-2"
+            >
+              <div class="flex items-center gap-2 text-[11px] text-white/80">
+                <PhFileText :size="15" class="text-accent shrink-0" />
+                <span>Como baixar o extrato OFX do <strong>{{ form.institution || 'seu banco' }}</strong>?</span>
+              </div>
+              <button
+                type="button"
+                @click="openOFXGuide?.(form.institution)"
+                class="text-accent font-bold text-[11px] hover:underline whitespace-nowrap cursor-pointer flex items-center gap-1 shrink-0"
+              >
+                <span>Ver passo a passo</span>
+              </button>
+            </div>
           </div>
 
           <!-- Tipo de Conta -->

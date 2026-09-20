@@ -112,7 +112,7 @@ const resetForm = () => {
 </script>
 
 <template>
-  <div class="max-w-4xl mx-auto flex flex-col gap-6">
+  <div data-tour="import-box" class="max-w-4xl mx-auto flex flex-col gap-6">
     <!-- Header -->
     <div>
       <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">

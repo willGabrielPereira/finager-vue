@@ -7,6 +7,10 @@ export interface UserProfile {
   email?: string;
   family_id: string;
   family_name?: string;
+  plan?: string;
+  subscription_status?: string;
+  onboarding_completed?: boolean;
+  onboarding_step?: number;
   created_at?: string;
 }
 
@@ -27,6 +31,7 @@ export const useAuthStore = defineStore('auth', {
   
   getters: {
     isAuthenticated: (state) => !!state.accessToken,
+    isOnboardingCompleted: (state) => !!state.user?.onboarding_completed,
   },
   
   actions: {
@@ -44,6 +49,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     async register(login: string, email: string, password: string, familyName?: string, inviteToken?: string) {
+      sessionStorage.removeItem('finager_tour_started');
       const payload: Record<string, any> = { login, email, password };
       if (familyName && familyName.trim().length > 0) {
         payload.family_name = familyName.trim();
@@ -64,6 +70,25 @@ export const useAuthStore = defineStore('auth', {
       } catch (err) {
         this.clearAuth();
       }
+    },
+
+    async updateOnboarding(completed: boolean, step: number) {
+      try {
+        const { data } = await api.patch('/me/onboarding', { completed, step });
+        if (this.user) {
+          this.user.onboarding_completed = completed;
+          this.user.onboarding_step = step;
+        }
+        return data;
+      } catch (err) {
+        console.error('Falha ao atualizar onboarding:', err);
+      }
+    },
+
+    async deleteAccount(password: string) {
+      const { data } = await api.delete('/me', { data: { password } });
+      this.clearAuth();
+      return data;
     },
 
     async fetchFamilyMembers() {
@@ -132,6 +157,7 @@ export const useAuthStore = defineStore('auth', {
       this.familyMembers = [];
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
+      sessionStorage.removeItem('finager_tour_started');
     }
   }
 });

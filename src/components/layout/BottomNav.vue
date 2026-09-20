@@ -37,6 +37,7 @@ const navItems = [
     <!-- Item 2: Extrato -->
     <router-link
       :to="navItems[1].path"
+      data-tour="bottom-nav-transactions"
       class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
       :class="route.path === navItems[1].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
     >
@@ -48,6 +49,7 @@ const navItems = [
     <button
       type="button"
       @click="$emit('open-action-menu')"
+      data-tour="mobile-action-btn"
       class="w-12 h-12 -mt-5 rounded-full bg-accent text-bg shadow-lg shadow-accent/25 flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
       title="Ações Rápidas"
     >
@@ -67,6 +69,7 @@ const navItems = [
     <!-- Item 4: Perfil -->
     <router-link
       :to="navItems[3].path"
+      data-tour="bottom-nav-profile"
       class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
       :class="route.path === navItems[3].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
     >

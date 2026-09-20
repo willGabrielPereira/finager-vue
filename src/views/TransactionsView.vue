@@ -17,7 +17,9 @@ import {
   PhArrowDownRight, 
   PhArrowUpRight, 
   PhCalendarBlank, 
-  PhCaretDown, 
+  PhCaretDown,
+  PhCaretLeft,
+  PhCaretRight, 
   PhPlus, 
   PhCircleNotch, 
   PhSparkle, 
@@ -88,6 +90,37 @@ const similarPrompt = ref<{
 const searchInput = ref('')
 const activeFilterTab = ref<'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED'>('ALL')
 
+// Controle de rolagem horizontal das abas de filtro com setas, wheel e affordance visual
+const chipsContainer = ref<HTMLElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+const updateChipsScroll = () => {
+  const el = chipsContainer.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 4
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
+}
+
+const scrollChips = (direction: 'left' | 'right') => {
+  const el = chipsContainer.value
+  if (!el) return
+  const offset = direction === 'left' ? -180 : 180
+  el.scrollBy({ left: offset, behavior: 'smooth' })
+}
+
+const handleChipsWheel = (e: WheelEvent) => {
+  if (!chipsContainer.value) return
+  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+    chipsContainer.value.scrollLeft += e.deltaY
+    updateChipsScroll()
+  }
+}
+
+watch(activeFilterTab, () => {
+  setTimeout(updateChipsScroll, 60)
+})
+
 // Dropdowns de Filtro Avançado
 const isAccountsMenuOpen = ref(false)
 const isTagsMenuOpen = ref(false)
@@ -109,6 +142,11 @@ const periodLabels: Record<PeriodPreset, string> = {
 }
 
 onMounted(async () => {
+  setTimeout(updateChipsScroll, 100)
+  if (chipsContainer.value) {
+    const observer = new ResizeObserver(updateChipsScroll)
+    observer.observe(chipsContainer.value)
+  }
   if (!authStore.isAuthenticated) return
   await Promise.all([
     store.fetchTransactions(),
@@ -461,13 +499,13 @@ const isCredit = (t: Transaction) => {
 <template>
   <div class="flex flex-col gap-5">
     <!-- Barra Superior: Título e Botões de Ação -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div data-tour="transactions-header" class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
       <div class="min-w-0">
         <h1 class="text-xl md:text-2xl font-bold tracking-tight text-white">Extrato & Transações</h1>
         <p class="text-xs text-white/50">Gerencie seus lançamentos bancários, manuais e faturas</p>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto pb-1 sm:pb-0">
+      <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 no-scrollbar">
         <button 
           @click="isAIModalOpen = true"
           class="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-accent/50 active:scale-95 shrink-0"
@@ -497,53 +535,95 @@ const isCredit = (t: Transaction) => {
     <!-- Bloco de Filtros Principal -->
     <div class="bg-surface rounded-2xl border border-white/5 p-3.5 flex flex-col gap-3 shadow-lg">
       <!-- Linha 1: Abas Rápidas e Busca -->
-      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-        <!-- Chips de Tipo/Status -->
-        <div class="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0 scroll-smooth no-scrollbar">
-          <button
+      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+        <!-- Container dos Chips com Indicadores Visuais de Scroll e Setas -->
+        <div class="relative flex items-center min-w-0 flex-1">
+          <!-- Seta Esquerda -->
+          <button 
+            v-if="canScrollLeft"
             type="button"
-            @click="setFilterTab('ALL')"
-            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-            :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            @click="scrollChips('left')"
+            class="absolute left-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
+            title="Ver opções anteriores"
           >
-            Todas
+            <PhCaretLeft :size="13" weight="bold" />
           </button>
-          <button
-            type="button"
-            @click="setFilterTab('DEBIT')"
-            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-            :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+
+          <!-- Fade Gradiente Esquerdo -->
+          <div 
+            v-if="canScrollLeft"
+            class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface via-surface/80 to-transparent pointer-events-none z-10"
+          ></div>
+
+          <!-- Container Rolável de Chips com Scrollbar Estilizada -->
+          <div 
+            ref="chipsContainer"
+            @scroll="updateChipsScroll"
+            @wheel.passive="handleChipsWheel"
+            class="flex items-center gap-1.5 overflow-x-auto scroll-smooth custom-h-scrollbar pb-2 pt-0.5 px-2 min-w-0 w-full"
           >
-            Despesas
-          </button>
-          <button
+            <button
+              type="button"
+              @click="setFilterTab('ALL')"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              @click="setFilterTab('DEBIT')"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            >
+              Despesas
+            </button>
+            <button
+              type="button"
+              @click="setFilterTab('CREDIT')"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            >
+              Receitas
+            </button>
+            <button
+              type="button"
+              @click="setFilterTab('UNTAGGED')"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            >
+              Sem Categoria
+            </button>
+            <button
+              type="button"
+              @click="setFilterTab('PLANNED')"
+              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            >
+              Previstas
+            </button>
+          </div>
+
+          <!-- Fade Gradiente Direito (indica claramente que há mais opções à direita) -->
+          <div 
+            v-if="canScrollRight"
+            class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-surface via-surface/80 to-transparent pointer-events-none z-10"
+          ></div>
+
+          <!-- Seta Direita com Pulsar Sutil (Affordance interativa de mais opções) -->
+          <button 
+            v-if="canScrollRight"
             type="button"
-            @click="setFilterTab('CREDIT')"
-            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-            :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
+            @click="scrollChips('right')"
+            class="absolute right-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0 animate-pulse hover:animate-none"
+            title="Mais opções à direita"
           >
-            Receitas
-          </button>
-          <button
-            type="button"
-            @click="setFilterTab('UNTAGGED')"
-            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-            :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-          >
-            Sem Categoria
-          </button>
-          <button
-            type="button"
-            @click="setFilterTab('PLANNED')"
-            class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer"
-            :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-          >
-            Previstas
+            <PhCaretRight :size="13" weight="bold" />
           </button>
         </div>
 
         <!-- Campo de Busca -->
-        <div class="relative w-full md:w-72">
+        <div class="relative w-full md:w-72 shrink-0">
           <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
           <input
             v-model="searchInput"
@@ -746,7 +826,7 @@ const isCredit = (t: Transaction) => {
         </button>
       </div>
 
-      <div v-else>
+      <div v-else class="overflow-x-auto custom-scrollbar">
         <!-- Versão Mobile (Cards Touch-Friendly) -->
         <div class="flex flex-col divide-y divide-white/5 md:hidden">
           <div 

@@ -1,0 +1,165 @@
+/* Finager Interactive Tour Theme (TourGuideJS Clean Style) */
+
+/* The SVG overlay itself MUST have transparent background and NO blur,
+   allowing Driver.js path cutout to show the real UI with 100% clarity */
+.driver-overlay {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 100000 !important;
+}
+
+/* The active element highlighted inside the spotlight cutout */
+.driver-active-element {
+  outline: 2.5px solid #10b981 !important;
+  outline-offset: 4px !important;
+  border-radius: 14px !important;
+  box-shadow: 0 0 25px rgba(16, 185, 129, 0.45) !important;
+  transition: outline 0.2s ease, box-shadow 0.2s ease !important;
+  position: relative !important;
+  z-index: 100002 !important;
+}
+
+/* Popover Card */
+.driver-popover.finager-tour-theme {
+  background: #0e172a !important;
+  color: #f8fafc !important;
+  border: 1px solid rgba(255, 255, 255, 0.16) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+  padding: 20px 22px !important;
+  min-width: 270px !important;
+  max-width: 380px !important;
+  font-family: inherit !important;
+  z-index: 100003 !important;
+  animation: tour-fade-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@media (max-width: 640px) {
+  .driver-popover.finager-tour-theme {
+    max-width: calc(100vw - 32px) !important;
+    min-width: 260px !important;
+    padding: 16px 18px !important;
+    border-radius: 16px !important;
+  }
+  .driver-popover.finager-tour-theme .driver-popover-title {
+    font-size: 15px !important;
+  }
+  .driver-popover.finager-tour-theme .driver-popover-description {
+    font-size: 12.5px !important;
+  }
+}
+
+@keyframes tour-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97) translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+/* Popover Title */
+.driver-popover.finager-tour-theme .driver-popover-title {
+  color: #ffffff !important;
+  font-size: 16px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.015em !important;
+  margin-bottom: 8px !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Popover Description */
+.driver-popover.finager-tour-theme .driver-popover-description {
+  color: rgba(255, 255, 255, 0.8) !important;
+  font-size: 13px !important;
+  line-height: 1.55 !important;
+  margin-bottom: 16px !important;
+}
+
+/* Step Progress Indicator (Passo 1 de 6) */
+.driver-popover.finager-tour-theme .driver-popover-progress-text {
+  color: rgba(255, 255, 255, 0.55) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.05em !important;
+}
+
+/* Close ('X') button in top-right */
+.driver-popover.finager-tour-theme .driver-popover-close-btn {
+  color: rgba(255, 255, 255, 0.5) !important;
+  transition: all 0.15s ease !important;
+  top: 14px !important;
+  right: 14px !important;
+  padding: 4px !important;
+  border-radius: 8px !important;
+}
+
+.driver-popover.finager-tour-theme .driver-popover-close-btn:hover {
+  color: #ffffff !important;
+  background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Footer Buttons */
+.driver-popover.finager-tour-theme .driver-popover-footer {
+  margin-top: 10px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 8px !important;
+}
+
+.driver-popover.finager-tour-theme .driver-popover-footer-btn {
+  border-radius: 12px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  padding: 7px 14px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  cursor: pointer !important;
+}
+
+/* Anterior Button */
+.driver-popover.finager-tour-theme .driver-popover-prev-btn {
+  background-color: rgba(255, 255, 255, 0.07) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+}
+
+.driver-popover.finager-tour-theme .driver-popover-prev-btn:hover {
+  background-color: rgba(255, 255, 255, 0.14) !important;
+  color: #ffffff !important;
+}
+
+/* Próximo / Concluir Button */
+.driver-popover.finager-tour-theme .driver-popover-next-btn {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%) !important;
+  color: #020617 !important;
+  font-weight: 700 !important;
+  border: none !important;
+  box-shadow: 0 3px 12px rgba(16, 185, 129, 0.35) !important;
+}
+
+.driver-popover.finager-tour-theme .driver-popover-next-btn:hover {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 5px 16px rgba(16, 185, 129, 0.45) !important;
+}
+
+/* Popover Arrow */
+.driver-popover.finager-tour-theme .driver-popover-arrow-side-left {
+  border-left-color: #0e172a !important;
+}
+.driver-popover.finager-tour-theme .driver-popover-arrow-side-right {
+  border-right-color: #0e172a !important;
+}
+.driver-popover.finager-tour-theme .driver-popover-arrow-side-top {
+  border-top-color: #0e172a !important;
+}
+.driver-popover.finager-tour-theme .driver-popover-arrow-side-bottom {
+  border-bottom-color: #0e172a !important;
+}

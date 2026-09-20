@@ -82,3 +82,17 @@ A aplicação segue guias rígidas de UI/UX, utilizando um tema **Dark Mode** qu
 * **📋 Transações & Filtros**: Tabela de transações gerenciável para explorar os gastos importados.
 * **📂 Upload OFX**: Fluxo pronto para a assimilação de extratos bancários brutos (`.ofx`).
 * **🏷️ Motor de Tags**: Capacidade de criar novas categorias (tags) e visualizá-las no balanço.
+
+
+---
+
+## 🛡️ Diretrizes de Feedback Visual e Diálogos (Regra do Projeto)
+
+> [!IMPORTANT]
+> **Proibição de Diálogos Nativos do Navegador:**
+> É expressamente proibido o uso de `window.alert()`, `window.confirm()` ou `window.prompt()` em qualquer componente ou view.
+> Todos os retornos visuais e confirmações de ações devem obrigatoriamente utilizar o utilitário padronizado em **`src/utils/feedback.ts`** (baseado em SweetAlert2 com tema Dark OLED):
+> 
+> * **Confirmações destrutivas / críticas:** `showAlert.confirm({ title, text, isDestructive: true })`
+> * **Notificações e retornos assíncronos:** `toast.success()`, `toast.error()`, `toast.warning()`, `toast.info()`
+> * **Alertas modais de bloqueio:** `showAlert.error()`, `showAlert.success()`

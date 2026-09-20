@@ -1,3 +1,20 @@
+/**
+ * ============================================================================
+ * PADRÃO OFICIAL DE FEEDBACK E DIÁLOGOS (FINAGER)
+ * ============================================================================
+ * REGRA OBRIGATÓRIA: NUNCA utilize alert(), confirm() ou prompt() nativos.
+ * Utilize exclusivamente os métodos exportados por este utilitário:
+ *
+ * - toast.success(title, text?)   -> Notificação rápida de sucesso (4s)
+ * - toast.error(title, text?)     -> Notificação de erro
+ * - toast.warning(title, text?)   -> Aviso de validação/regra
+ * - toast.info(title, text?)      -> Mensagem informativa
+ * - showAlert.confirm(options)    -> Diálogo modal de confirmação (destrutivo ou normal)
+ * - showAlert.error(title, text?) -> Modal formal de erro
+ * - showAlert.success(title, text?) -> Modal formal de sucesso
+ * ============================================================================
+ */
+
 import Swal from 'sweetalert2';
 
 // Instância base de Toast configurada para Dark OLED Finager
