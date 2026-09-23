@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import CurrencyInput from './CurrencyInput.vue'
 import { TagCombobox } from './tag-combobox'
 import { Button } from './button'
 import { Input } from './input'
+import { DatePicker } from './date-picker'
 import { PhBank, PhCreditCard, PhX, PhPlus, PhCircleNotch, PhCheck, PhClock } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
@@ -72,7 +73,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     label: acc.name,
     sublabel: acc.institution,
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+    icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
   }))
 })
 
@@ -253,11 +254,7 @@ const submit = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <Input
-              v-model="datePosted"
-              type="date"
-              class="cursor-pointer"
-            />
+            <DatePicker v-model="datePosted" />
           </div>
         </div>
 

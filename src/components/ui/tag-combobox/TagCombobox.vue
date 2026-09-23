@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 interface Props {
   modelValue?: string | null
   secondaryTags?: string[]
+  allowSecondaryTags?: boolean
   placeholder?: string
   disabled?: boolean
   clearable?: boolean
@@ -31,6 +32,7 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   modelValue: '',
   secondaryTags: () => [],
+  allowSecondaryTags: false,
   placeholder: 'Sem Categoria',
   disabled: false,
   clearable: true,
@@ -321,14 +323,14 @@ const handleKeydown = (e: KeyboardEvent) => {
 
             <!-- Ação secundária para alternar tag adicional (se aplicável) -->
             <button
-              v-if="secondaryTags"
+              v-if="allowSecondaryTags"
               type="button"
               class="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white"
               :title="secondaryTags.includes(tag.id) ? 'Remover tag secundária' : 'Adicionar tag secundária'"
               @click.stop="toggleSecondary(tag.id)"
             >
               <span
-                class="w-1.5 h-1.5 rounded-full"
+                class="block w-1.5 h-1.5 rounded-full"
                 :class="secondaryTags.includes(tag.id) ? 'bg-accent' : 'border border-white/40'"
               />
             </button>

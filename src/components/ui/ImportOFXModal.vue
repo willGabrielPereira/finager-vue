@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
@@ -37,7 +37,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     label: acc.name,
     sublabel: acc.institution,
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+    icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
   }))
 })
 

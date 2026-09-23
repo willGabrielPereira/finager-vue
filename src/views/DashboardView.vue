@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, markRaw } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
@@ -74,7 +74,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     {
       value: '',
       label: 'Consolidado (Todas as Contas)',
-      icon: PhWallet
+      icon: markRaw(PhWallet)
     }
   ]
   accountsStore.accounts.forEach(acc => {
@@ -83,7 +83,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
       label: acc.name,
       sublabel: acc.institution,
       badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-      icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+      icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
     })
   })
   return list

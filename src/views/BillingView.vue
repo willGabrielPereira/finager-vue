@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
 import { useBillingStore } from '../stores/billing'
 import { useAuthStore } from '../stores/auth'
 import { 
@@ -47,7 +47,7 @@ const planBadgeInfo = computed(() => {
     return {
       label: 'Plano Pro',
       color: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400',
-      icon: PhCrown,
+      icon: markRaw(PhCrown),
       tagline: 'Acesso completo a todos os recursos avançados'
     }
   }
@@ -55,14 +55,14 @@ const planBadgeInfo = computed(() => {
     return {
       label: 'Lifetime Pro (Amigos & VIP)',
       color: 'bg-purple-500/15 border-purple-500/30 text-purple-300',
-      icon: PhSparkle,
+      icon: markRaw(PhSparkle),
       tagline: 'Acesso vitalício irrestrito e perpétuo'
     }
   }
   return {
     label: 'Plano Gratuito (Free)',
     color: 'bg-blue-500/15 border-blue-500/30 text-blue-400',
-    icon: PhLightning,
+    icon: markRaw(PhLightning),
     tagline: 'Ideal para organização pessoal essencial'
   }
 })

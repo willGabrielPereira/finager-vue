@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, computed } from 'vue'
+import { onMounted, onUnmounted, ref, watch, computed, markRaw } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useAuthStore } from '../stores/auth'
 import AppSelect from '../components/ui/AppSelect.vue'
@@ -239,7 +239,7 @@ const accountFilterOptions = computed(() => {
     value: a.id,
     label: a.name,
     badge: a.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: a.type === 'CREDIT_CARD' ? PhCreditCard : PhBank,
+    icon: markRaw(a.type === 'CREDIT_CARD' ? PhCreditCard : PhBank),
   }))
 })
 
@@ -842,6 +842,7 @@ const isCredit = (t: Transaction) => {
                   placeholder="+ Categoria"
                   :model-value="t.tags?.[0] || null"
                   :secondary-tags="t.tags?.slice(1) || []"
+                  allow-secondary-tags
                   @select-category="(tagId) => onCategorySelected(t.id, tagId)"
                   @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(t.id, tagId)"
                 />
@@ -921,6 +922,7 @@ const isCredit = (t: Transaction) => {
                     placeholder="+ Categoria"
                     :model-value="t.tags?.[0] || null"
                     :secondary-tags="t.tags?.slice(1) || []"
+                    allow-secondary-tags
                     @select-category="(tagId) => onCategorySelected(t.id, tagId)"
                     @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(t.id, tagId)"
                   />

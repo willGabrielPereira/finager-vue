@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, markRaw } from 'vue'
 import { type Transaction, useTransactionsStore } from '../../stores/transactions'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
@@ -8,6 +8,7 @@ import CurrencyInput from './CurrencyInput.vue'
 import { TagCombobox } from './tag-combobox'
 import { Button } from './button'
 import { Input } from './input'
+import { DatePicker } from './date-picker'
 import { toast, showAlert } from '../../utils/feedback'
 import { 
   PhX, 
@@ -125,7 +126,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     label: acc.name,
     sublabel: acc.institution,
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+    icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
   }))
 })
 
@@ -353,9 +354,8 @@ const handleDelete = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <Input
+            <DatePicker
               v-model="datePosted"
-              type="date"
               class="bg-[#0b1329] border-white/10 h-9 text-xs"
             />
           </div>
