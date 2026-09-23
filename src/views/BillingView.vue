@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useBillingStore } from '../stores/billing'
 import { useAuthStore } from '../stores/auth'
@@ -19,6 +19,10 @@ import {
   PhCheckCircle,
   PhWarningCircle
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 
 const billingStore = useBillingStore()
 const authStore = useAuthStore()
@@ -126,13 +130,14 @@ const handleApplyCoupon = async () => {
       </div>
 
       <!-- Badge do Plano Atual no Header -->
-      <div 
-        class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border text-xs font-semibold self-start sm:self-center"
+      <Badge 
+        variant="outline"
+        class="gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold self-start sm:self-center"
         :class="planBadgeInfo.color"
       >
         <component :is="planBadgeInfo.icon" :size="16" weight="duotone" />
         <span>{{ planBadgeInfo.label }}</span>
-      </div>
+      </Badge>
     </div>
 
     <!-- Feedback Global de Simulação -->
@@ -146,7 +151,7 @@ const handleApplyCoupon = async () => {
     </div>
 
     <!-- Card Principal: Status da Família & Limites de Quota -->
-    <div class="bg-surface rounded-2xl p-6 sm:p-8 border border-white/5 shadow-xl relative overflow-hidden">
+    <Card class="p-6 sm:p-8 shadow-xl relative overflow-hidden">
       <!-- Glow decorativo de fundo -->
       <div 
         class="absolute -right-16 -top-16 w-64 h-64 rounded-full blur-3xl pointer-events-none opacity-20"
@@ -284,7 +289,7 @@ const handleApplyCoupon = async () => {
 
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Comparativo de Planos (Cards lado a lado) -->
     <div>
@@ -298,18 +303,18 @@ const handleApplyCoupon = async () => {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         
         <!-- Card Free -->
-        <div 
-          class="rounded-2xl p-6 border flex flex-col justify-between transition-all"
+        <Card 
+          class="p-6 flex flex-col justify-between transition-all"
           :class="billingStore.isFree 
-            ? 'bg-surface border-blue-500/30 shadow-lg' 
+            ? 'border-blue-500/30 shadow-lg' 
             : 'bg-surface/50 border-white/5 opacity-80 hover:opacity-100'"
         >
           <div class="flex flex-col gap-4">
             <div class="flex items-center justify-between">
               <span class="text-xs font-bold uppercase tracking-wider text-white/50">Plano Gratuito</span>
-              <span v-if="billingStore.isFree" class="text-[10px] font-semibold bg-blue-500/20 text-blue-300 border border-blue-500/30 px-2 py-0.5 rounded-full">
+              <Badge v-if="billingStore.isFree" variant="outline" class="text-[10px] font-semibold bg-blue-500/20 text-blue-300 border-blue-500/30 px-2 py-0.5">
                 Seu Plano Atual
-              </span>
+              </Badge>
             </div>
 
             <div>
@@ -351,37 +356,38 @@ const handleApplyCoupon = async () => {
           </div>
 
           <div class="mt-6 pt-4 border-t border-white/5">
-            <button
+            <Button
               v-if="!billingStore.isFree"
-              type="button"
+              variant="outline"
+              size="sm"
               @click="handleSimulateDowngrade"
               :disabled="billingStore.actionLoading"
-              class="w-full py-2.5 px-4 rounded-xl border border-white/10 hover:border-white/20 text-white/80 hover:text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              class="w-full text-xs font-semibold"
             >
               Alternar para Plano Free
-            </button>
+            </Button>
             <div v-else class="text-center text-xs text-white/40 py-2">
               Plano base ativado
             </div>
           </div>
-        </div>
+        </Card>
 
         <!-- Card Pro -->
-        <div 
-          class="rounded-2xl p-6 border flex flex-col justify-between transition-all relative overflow-hidden"
+        <Card 
+          class="p-6 flex flex-col justify-between transition-all relative overflow-hidden"
           :class="billingStore.isPro 
-            ? 'bg-surface border-emerald-500/40 shadow-xl shadow-emerald-500/5' 
-            : 'bg-surface border-accent/30 shadow-lg'"
+            ? 'border-emerald-500/40 shadow-xl shadow-emerald-500/5' 
+            : 'border-accent/30 shadow-lg'"
         >
           <!-- Badge Destaque -->
           <div class="absolute top-4 right-4">
-            <span v-if="billingStore.isPro" class="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+            <Badge v-if="billingStore.isPro" variant="outline" class="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border-emerald-500/30 px-2.5 py-0.5 flex items-center gap-1">
               <PhCrown :size="12" weight="fill" />
               Seu Plano Atual
-            </span>
-            <span v-else class="text-[10px] font-bold bg-accent text-bg px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+            </Badge>
+            <Badge v-else class="text-[10px] font-bold bg-accent text-bg px-2.5 py-0.5 uppercase tracking-wider">
               Recomendado
-            </span>
+            </Badge>
           </div>
 
           <div class="flex flex-col gap-4">
@@ -425,22 +431,22 @@ const handleApplyCoupon = async () => {
           </div>
 
           <div class="mt-6 pt-4 border-t border-white/5">
-            <button
+            <Button
               v-if="!billingStore.isPro"
-              type="button"
+              size="sm"
               @click="handleSimulateUpgrade"
               :disabled="billingStore.actionLoading"
-              class="w-full py-2.5 px-4 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              class="w-full gap-2 font-bold shadow-lg shadow-accent/20"
             >
               <PhRocketLaunch :size="16" weight="bold" />
               <span>Fazer Upgrade para Pro (Simulado)</span>
-            </button>
+            </Button>
             <div v-else class="text-center text-xs text-emerald-400 font-semibold py-2 flex items-center justify-center gap-1.5">
               <PhCheckCircle :size="16" weight="fill" />
               <span>Você já possui todos os recursos desbloqueados!</span>
             </div>
           </div>
-        </div>
+        </Card>
 
       </div>
     </div>
@@ -449,7 +455,7 @@ const handleApplyCoupon = async () => {
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       
       <!-- Card Cupom Promocional -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col justify-between gap-4">
+      <Card class="p-6 shadow-md flex flex-col justify-between gap-4">
         <div>
           <div class="flex items-center gap-2 pb-3 border-b border-white/5">
             <PhTicket :size="18" class="text-accent" weight="duotone" />
@@ -460,19 +466,20 @@ const handleApplyCoupon = async () => {
           </p>
 
           <form @submit.prevent="handleApplyCoupon" class="mt-4 flex gap-2">
-            <input
+            <Input
               v-model="couponCode"
               type="text"
               placeholder="Ex: AMIGO100"
-              class="flex-1 bg-bg border border-white/10 rounded-xl px-3.5 py-2 text-xs text-white uppercase tracking-wider focus:outline-none focus:ring-1 focus:ring-accent"
+              class="flex-1 uppercase tracking-wider text-xs"
             />
-            <button
+            <Button
               type="submit"
+              size="sm"
+              variant="secondary"
               :disabled="billingStore.actionLoading || !couponCode.trim()"
-              class="py-2 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-40"
             >
               Aplicar
-            </button>
+            </Button>
           </form>
 
           <p v-if="couponSuccess" class="text-xs text-emerald-400 mt-2 flex items-center gap-1.5">
@@ -489,19 +496,19 @@ const handleApplyCoupon = async () => {
           <PhInfo :size="15" class="text-accent shrink-0 mt-0.5" />
           <span>Dica: experimente usar o código <strong>AMIGO100</strong> para testar a ativação do plano vitalício.</span>
         </div>
-      </div>
+      </Card>
 
       <!-- Card Console de Testes (Mock Provider) -->
-      <div class="bg-surface rounded-2xl p-6 border border-amber-500/20 shadow-md flex flex-col justify-between gap-4">
+      <Card class="p-6 border-amber-500/20 shadow-md flex flex-col justify-between gap-4">
         <div>
           <div class="flex items-center justify-between pb-3 border-b border-white/5">
             <div class="flex items-center gap-2">
               <PhLightning :size="18" class="text-amber-400" weight="duotone" />
               <h3 class="text-sm font-bold text-white">Ambiente de Testes (Mock Gateway)</h3>
             </div>
-            <span class="text-[10px] font-mono bg-amber-500/15 border border-amber-500/30 text-amber-300 px-2 py-0.5 rounded-full">
+            <Badge variant="outline" class="text-[10px] font-mono bg-amber-500/15 border-amber-500/30 text-amber-300 px-2 py-0.5">
               Dev Sandbox
-            </span>
+            </Badge>
           </div>
           
           <p class="text-xs text-white/50 mt-3">
@@ -509,25 +516,29 @@ const handleApplyCoupon = async () => {
           </p>
 
           <div class="mt-4 flex flex-col sm:flex-row gap-2.5">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="handleSimulateUpgrade"
               :disabled="billingStore.actionLoading"
-              class="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              class="flex-1 gap-1.5 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/15"
             >
               <PhRocketLaunch :size="15" />
               <span>Simular Upgrade PRO</span>
-            </button>
+            </Button>
 
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="handleSimulateDowngrade"
               :disabled="billingStore.actionLoading"
-              class="flex-1 flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-rose-300 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              class="flex-1 gap-1.5 border-rose-500/20 text-rose-300 hover:bg-rose-500/10"
             >
               <PhArrowClockwise :size="15" />
               <span>Simular Downgrade FREE</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -535,9 +546,8 @@ const handleApplyCoupon = async () => {
           <PhShieldCheck :size="15" class="text-emerald-400 shrink-0 mt-0.5" />
           <span>As travas do banco de dados (máx. 2 contas e 2 membros no plano Free) respondem dinamicamente a essas alterações.</span>
         </div>
-      </div>
+      </Card>
 
     </div>
-
   </div>
 </template>

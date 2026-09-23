@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useTagsStore } from '../stores/tags'
@@ -7,6 +7,8 @@ import { inject } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
 import OnboardingChecklist from '../components/ui/OnboardingChecklist.vue'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 const router = useRouter()
 const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
@@ -408,7 +410,7 @@ const formatDate = (dateString: string) => {
     <!-- Bento Grid de Métricas Financeiras -->
     <div data-tour="kpi-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <!-- Card: Receitas -->
-      <div data-tour="kpi-card-primary" class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card data-tour="kpi-card-primary" class="p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Receitas em {{ monthNames[selectedMonth] }}</span>
           <div class="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
@@ -421,10 +423,10 @@ const formatDate = (dateString: string) => {
           </span>
           <p class="text-[11px] text-white/40 mt-1">Entradas confirmadas no período</p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Despesas -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Despesas em {{ monthNames[selectedMonth] }}</span>
           <div class="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center text-red-400">
@@ -442,10 +444,10 @@ const formatDate = (dateString: string) => {
             <span v-else>Gastos efetivados no período</span>
           </p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Saldo Líquido -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Saldo Líquido</span>
           <div class="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-400">
@@ -461,10 +463,10 @@ const formatDate = (dateString: string) => {
           </span>
           <p class="text-[11px] text-white/40 mt-1">Receitas menãos despesas</p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Saldo Projetado -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-amber-400/90">Saldo Projetado</span>
           <div class="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-400">
@@ -481,18 +483,18 @@ const formatDate = (dateString: string) => {
             Abatendo {{ formatCurrency(totalPlanned) }} em gastos previstos
           </p>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Linha Principal: Gráfico de Rosca e Últimas Transações -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Gráfico de Rosca: Despesas por Categoria -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col gap-4 min-h-[380px]">
+      <Card class="p-6 flex flex-col gap-4 min-h-[380px]">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-bold text-white tracking-wide">Gastos por Categoria</h2>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/50">
+          <Badge variant="secondary">
             {{ monthNames[selectedMonth] }}
-          </span>
+          </Badge>
         </div>
 
         <div class="relative h-64 flex items-center justify-center">
@@ -502,10 +504,10 @@ const formatDate = (dateString: string) => {
           </div>
           <Doughnut v-else :data="chartData" :options="chartOptions" />
         </div>
-      </div>
+      </Card>
 
       <!-- Tabela: Lançamentos Recentes do Mês -->
-      <div class="lg:col-span-2 bg-surface rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col justify-between min-h-[380px]">
+      <Card class="lg:col-span-2 p-6 flex flex-col justify-between min-h-[380px]">
         <div class="flex flex-col gap-4">
           <div class="flex items-center justify-between">
             <div>
@@ -584,7 +586,8 @@ const formatDate = (dateString: string) => {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   </div>
 </template>
+

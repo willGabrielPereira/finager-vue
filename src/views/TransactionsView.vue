@@ -5,7 +5,8 @@ import { useAuthStore } from '../stores/auth'
 import AppSelect from '../components/ui/AppSelect.vue'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
-import CategoryCombobox from '../components/ui/CategoryCombobox.vue'
+import { TagCombobox } from '@/components/ui/tag-combobox'
+import { Button } from '@/components/ui/button'
 import SimilarTagPrompt from '../components/ui/SimilarTagPrompt.vue'
 import AIReclassifyModal from '../components/ui/AIReclassifyModal.vue'
 import CreateTransactionModal from '../components/ui/CreateTransactionModal.vue'
@@ -39,10 +40,8 @@ const store = useTransactionsStore()
 const tagsStore = useTagsStore()
 const accountsStore = useAccountsStore()
 
-// Estado do Seletor de Categoria Inline
-const activeDropdownTxId = ref<string | null>(null)
+// Estado de atualização de transação
 const updatingTxId = ref<string | null>(null)
-const dropdownPosition = ref({ left: '0px', top: '0px' })
 
 // Modais e Prompts
 const isAIModalOpen = ref(false)
@@ -164,18 +163,12 @@ onUnmounted(() => {
 })
 
 const onWindowClick = () => {
-  closeCategoryDropdown()
   isAccountsMenuOpen.value = false
   isTagsMenuOpen.value = false
   isPeriodMenuOpen.value = false
 }
 
-const onWindowScroll = (e: Event) => {
-  const target = e.target as HTMLElement
-  if (target && (target.closest?.('.category-combobox-container') || target.classList?.contains('category-combobox-container'))) {
-    return
-  }
-  closeCategoryDropdown()
+const onWindowScroll = () => {
   isAccountsMenuOpen.value = false
   isTagsMenuOpen.value = false
   isPeriodMenuOpen.value = false
@@ -349,36 +342,7 @@ const getAccountById = (id: string) => {
   return accountsStore.accounts.find((a) => a.id === id)
 }
 
-const toggleCategoryDropdown = (txId: string, event: Event) => {
-  event.stopPropagation()
-  if (activeDropdownTxId.value === txId) {
-    activeDropdownTxId.value = null
-  } else {
-    activeDropdownTxId.value = txId
-    isAccountsMenuOpen.value = false
-    isTagsMenuOpen.value = false
-    isPeriodMenuOpen.value = false
-
-    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-    const dropdownHeight = 320
-    const windowHeight = window.innerHeight
-    const opensUpward = rect.bottom + dropdownHeight > windowHeight && rect.top - dropdownHeight > 0
-
-    dropdownPosition.value = {
-      left: Math.max(12, Math.min(rect.left, window.innerWidth - 340)) + 'px',
-      top: (opensUpward 
-        ? (rect.top - dropdownHeight - 6) 
-        : (rect.bottom + 6)) + 'px',
-    }
-  }
-}
-
-const closeCategoryDropdown = () => {
-  activeDropdownTxId.value = null
-}
-
 const onCategorySelected = async (txId: string, tagId: string | null) => {
-  closeCategoryDropdown()
   updatingTxId.value = txId
 
   const tx = store.transactions.find((t) => t.id === txId)
@@ -506,29 +470,34 @@ const isCredit = (t: Transaction) => {
       </div>
 
       <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 no-scrollbar">
-        <button 
+        <Button 
+          variant="outline"
+          size="sm"
+          class="border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent gap-1.5"
           @click="isAIModalOpen = true"
-          class="inline-flex items-center gap-1.5 border border-accent/30 bg-accent/10 hover:bg-accent/20 text-accent px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-accent/50 active:scale-95 shrink-0"
         >
           <PhSparkle :size="15" weight="fill" />
           <span>Classificar com IA</span>
-        </button>
+        </Button>
 
-        <button 
+        <Button 
+          variant="outline"
+          size="sm"
+          class="gap-1.5"
           @click="isImportModalOpen = true" 
-          class="inline-flex items-center gap-1.5 border border-white/10 bg-white/5 hover:bg-white/10 text-white px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer hover:border-white/20 active:scale-95 shrink-0"
         >
           <PhUploadSimple :size="15" />
           <span>Importar OFX</span>
-        </button>
+        </Button>
 
-        <button 
+        <Button 
+          size="sm"
+          class="gap-1.5"
           @click="isCreateModalOpen = true" 
-          class="inline-flex items-center gap-1.5 bg-accent hover:bg-accent/90 text-bg px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer shadow-md shadow-accent/20 active:scale-95 shrink-0"
         >
           <PhPlus :size="15" weight="bold" />
           <span>Novo Lançamento</span>
-        </button>
+        </Button>
       </div>
     </div>
 
@@ -868,28 +837,14 @@ const isCredit = (t: Transaction) => {
             <div class="flex items-center justify-between pt-1" @click.stop>
               <div class="flex items-center gap-1.5 flex-wrap">
                 <!-- Seletor de Categoria Principal -->
-                <button
-                  type="button"
-                  @click="toggleCategoryDropdown(t.id, $event)"
-                  class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer active:scale-95"
-                  :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
-                    backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
-                    borderColor: (getTagById(t.tags[0])?.color || '#10b981') + '40',
-                    color: getTagById(t.tags[0])?.color || '#10b981',
-                  } : {
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    borderColor: 'rgba(255,255,255,0.1)',
-                    color: 'rgba(255,255,255,0.5)',
-                  }"
-                >
-                  <span 
-                    v-if="t.tags && t.tags.length > 0 && getTagById(t.tags[0])"
-                    class="w-2 h-2 rounded-full" 
-                    :style="{ backgroundColor: getTagById(t.tags[0])?.color }"
-                  ></span>
-                  <span>{{ t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? getTagById(t.tags[0])?.name : '+ Categoria' }}</span>
-                  <PhCaretDown :size="12" class="opacity-50" />
-                </button>
+                <TagCombobox
+                  compact
+                  placeholder="+ Categoria"
+                  :model-value="t.tags?.[0] || null"
+                  :secondary-tags="t.tags?.slice(1) || []"
+                  @select-category="(tagId) => onCategorySelected(t.id, tagId)"
+                  @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(t.id, tagId)"
+                />
 
                 <!-- Badge de Conta -->
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60">
@@ -961,28 +916,14 @@ const isCredit = (t: Transaction) => {
               <td class="p-4">
                 <!-- Seletor de Categoria Desktop -->
                 <div class="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    @click="toggleCategoryDropdown(t.id, $event)"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all cursor-pointer hover:brightness-110 active:scale-95"
-                    :style="t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? {
-                      backgroundColor: (getTagById(t.tags[0])?.color || '#10b981') + '18',
-                      borderColor: (getTagById(t.tags[0])?.color || '#10b981') + '40',
-                      color: getTagById(t.tags[0])?.color || '#10b981',
-                    } : {
-                      backgroundColor: 'rgba(255,255,255,0.03)',
-                      borderColor: 'rgba(255,255,255,0.1)',
-                      color: 'rgba(255,255,255,0.4)',
-                    }"
-                  >
-                    <span 
-                      v-if="t.tags && t.tags.length > 0 && getTagById(t.tags[0])"
-                      class="w-2 h-2 rounded-full" 
-                      :style="{ backgroundColor: getTagById(t.tags[0])?.color }"
-                    ></span>
-                    <span>{{ t.tags && t.tags.length > 0 && getTagById(t.tags[0]) ? getTagById(t.tags[0])?.name : '+ Categoria' }}</span>
-                    <PhCaretDown :size="12" class="opacity-50" />
-                  </button>
+                  <TagCombobox
+                    compact
+                    placeholder="+ Categoria"
+                    :model-value="t.tags?.[0] || null"
+                    :secondary-tags="t.tags?.slice(1) || []"
+                    @select-category="(tagId) => onCategorySelected(t.id, tagId)"
+                    @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(t.id, tagId)"
+                  />
 
                   <!-- Tags Secundárias -->
                   <span 
@@ -1054,58 +995,7 @@ const isCredit = (t: Transaction) => {
       </div>
     </div>
 
-    <!-- Seletor de Categoria com Mais Usadas e Busca -->
-    <Teleport to="body">
-      <div v-if="activeDropdownTxId">
-        <!-- Mobile: Bottom Sheet com Backdrop -->
-        <div 
-          class="fixed inset-0 z-[10000] bg-black/75 backdrop-blur-xs flex items-end md:hidden animate-in fade-in duration-150"
-          @click="closeCategoryDropdown"
-        >
-          <div 
-            class="w-full bg-surface border-t border-white/10 rounded-t-3xl p-4 max-h-[85vh] overflow-y-auto animate-in slide-in-from-bottom duration-200 category-combobox-container"
-            @click.stop
-          >
-            <div class="w-12 h-1 bg-white/20 rounded-full mx-auto mb-3"></div>
-            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10">
-              <span class="text-xs font-bold text-white">Classificar Transação</span>
-              <button 
-                type="button" 
-                @click="closeCategoryDropdown" 
-                class="text-white/40 hover:text-white p-1 cursor-pointer"
-              >
-                <PhX :size="16" />
-              </button>
-            </div>
-            <CategoryCombobox
-              :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
-              :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
-              @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
-              @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
-              @close="closeCategoryDropdown"
-            />
-          </div>
-        </div>
 
-        <!-- Desktop: Dropdown Flutuante Posicionado com Auto-Dismiss no Scroll -->
-        <div 
-          class="hidden md:block fixed z-[10005] category-combobox-container"
-          :style="{
-            left: dropdownPosition.left,
-            top: dropdownPosition.top,
-          }"
-          @click.stop
-        >
-          <CategoryCombobox
-            :category-id="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.[0] || null"
-            :secondary-tags="store.transactions.find(t => t.id === activeDropdownTxId)?.tags?.slice(1) || []"
-            @select-category="(tagId) => onCategorySelected(activeDropdownTxId!, tagId)"
-            @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(activeDropdownTxId!, tagId)"
-            @close="closeCategoryDropdown"
-          />
-        </div>
-      </div>
-    </Teleport>
 
     <!-- Banner Flutuante de Propagação para Transações Parecidas -->
     <SimilarTagPrompt

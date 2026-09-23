@@ -4,6 +4,7 @@ import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { api } from '../../api/axios'
+import { Button } from './button'
 import { 
   PhX, 
   PhUploadSimple, 
@@ -160,13 +161,13 @@ const reset = () => {
           </div>
         </div>
 
-        <button 
+        <Button 
           type="button"
           @click="reset"
-          class="w-full py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer mt-1"
+          class="w-full bg-accent text-bg font-bold text-xs hover:opacity-90 mt-1"
         >
           Concluir
-        </button>
+        </Button>
       </div>
 
       <!-- Formulário -->
@@ -214,23 +215,25 @@ const reset = () => {
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             @click="reset"
-            class="px-4 py-2 text-xs font-semibold text-white/50 hover:text-white transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             @click="submit"
             :disabled="importing || !selectedFile"
-            class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            class="bg-accent text-bg font-bold hover:opacity-90"
           >
-            <PhCircleNotch v-if="importing" :size="16" class="animate-spin" />
-            <PhUploadSimple v-else :size="16" weight="bold" />
+            <PhCircleNotch v-if="importing" :size="16" class="animate-spin mr-1.5" />
+            <PhUploadSimple v-else :size="16" weight="bold" class="mr-1.5" />
             <span>{{ importing ? 'Importando...' : 'Importar Extrato' }}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

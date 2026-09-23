@@ -16,6 +16,9 @@ import {
   PhUsers,
   PhLock
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 const router = useRouter()
 
@@ -125,9 +128,9 @@ const resetForm = () => {
     </div>
 
     <!-- Sucesso / Resultado da Importação -->
-    <div 
+    <Card 
       v-if="importResult" 
-      class="bg-surface rounded-2xl p-6 sm:p-8 border border-accent/20 shadow-xl flex flex-col gap-6"
+      class="p-6 sm:p-8 border-accent/20 shadow-xl flex flex-col gap-6"
     >
       <div class="flex items-center gap-4">
         <div class="w-12 h-12 rounded-2xl bg-accent/20 text-accent flex items-center justify-center border border-accent/30">
@@ -161,27 +164,28 @@ const resetForm = () => {
 
       <!-- Ações pós-import -->
       <div class="flex flex-col sm:flex-row items-center gap-3 pt-2">
-        <button
-          type="button"
+        <Button
+          size="lg"
           @click="router.push('/transactions')"
-          class="w-full sm:w-auto flex-1 flex items-center justify-center gap-2 py-3 px-6 rounded-xl bg-accent text-bg font-bold text-sm hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20"
+          class="w-full sm:w-auto flex-1 gap-2 font-bold shadow-lg shadow-accent/20"
         >
           <span>Ir para Transações</span>
           <PhArrowRight :size="16" weight="bold" />
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="outline"
+          size="lg"
           @click="resetForm"
-          class="w-full sm:w-auto px-5 py-3 rounded-xl bg-white/5 hover:bg-white/10 text-white font-medium text-sm transition-all border border-white/10 cursor-pointer"
+          class="w-full sm:w-auto"
         >
           Importar Outro Arquivo
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
 
     <!-- Formulário de Importação -->
     <div v-else class="flex flex-col gap-6">
-      <div class="bg-surface rounded-2xl p-6 sm:p-8 border border-white/5 shadow-md flex flex-col gap-6">
+      <Card class="p-6 sm:p-8 flex flex-col gap-6 shadow-md">
         <!-- Seleção de Conta Bancária -->
         <div>
           <div class="flex items-center justify-between mb-2">
@@ -206,14 +210,14 @@ const resetForm = () => {
           <!-- Estado Sem Contas -->
           <div v-if="accounts.length === 0" class="p-6 rounded-2xl bg-white/5 border border-white/10 text-center flex flex-col items-center gap-3">
             <p class="text-xs text-white/60">Você ainda não possui contas bancárias cadastradas.</p>
-            <button
-              type="button"
+            <Button
+              size="sm"
               @click="router.push('/accounts')"
-              class="px-4 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
+              class="gap-1.5 font-bold"
             >
               <PhPlus :size="14" weight="bold" />
               <span>Cadastrar Minha Primeira Conta</span>
-            </button>
+            </Button>
           </div>
 
           <!-- Grade de Contas Selecionáveis -->
@@ -238,9 +242,9 @@ const resetForm = () => {
               <div class="flex-1 min-w-0">
                 <p class="text-xs font-bold truncate text-white">{{ acc.name }}</p>
                 <div class="flex items-center gap-1.5 mt-0.5">
-                  <span class="text-[10px] px-1.5 py-0.2 rounded bg-white/5 text-white/60">
+                  <Badge variant="outline" class="text-[10px] px-1.5 py-0">
                     {{ acc.type === 'CREDIT_CARD' ? 'Cartão de Crédito' : 'Conta Corrente' }}
-                  </span>
+                  </Badge>
                   <span 
                     class="text-[10px] flex items-center gap-0.5"
                     :class="acc.is_shared ? 'text-blue-400' : 'text-amber-400/80'"
@@ -309,22 +313,22 @@ const resetForm = () => {
         </div>
 
         <!-- Botão Importar -->
-        <button
-          type="button"
+        <Button
+          size="lg"
           :disabled="loading || !selectedFile || !selectedAccountId"
           @click="handleImport"
-          class="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-xl bg-accent text-bg font-bold text-sm hover:opacity-90 active:scale-[0.99] transition-all cursor-pointer shadow-lg shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          class="w-full gap-2 font-bold shadow-lg shadow-accent/20"
         >
           <PhArrowsClockwise v-if="loading" :size="18" class="animate-spin" />
           <PhUploadSimple v-else :size="18" weight="bold" />
           <span v-if="loading">Processando Extrato OFX...</span>
           <span v-else>Processar e Reconciliar OFX</span>
-        </button>
-      </div>
+        </Button>
+      </Card>
 
       <!-- Dicas e Recursos de Inteligência -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div class="bg-surface/60 rounded-xl p-4 border border-white/5 flex items-start gap-3">
+        <Card class="p-4 flex items-start gap-3 bg-surface/60">
           <div class="w-8 h-8 rounded-lg bg-emerald-500/15 text-emerald-400 flex items-center justify-center shrink-0">
             <PhArrowsClockwise :size="18" weight="bold" />
           </div>
@@ -332,9 +336,9 @@ const resetForm = () => {
             <h3 class="text-xs font-bold text-white">Reconciliação Automática</h3>
             <p class="text-[11px] text-white/50 mt-0.5">Pagamentos manuais e previstos são associados ao OFX para evitar lançamentos duplicados.</p>
           </div>
-        </div>
+        </Card>
 
-        <div class="bg-surface/60 rounded-xl p-4 border border-white/5 flex items-start gap-3">
+        <Card class="p-4 flex items-start gap-3 bg-surface/60">
           <div class="w-8 h-8 rounded-lg bg-teal-500/15 text-teal-300 flex items-center justify-center shrink-0">
             <PhLightning :size="18" weight="fill" />
           </div>
@@ -342,9 +346,9 @@ const resetForm = () => {
             <h3 class="text-xs font-bold text-white">Classificação em 2 Camadas</h3>
             <p class="text-[11px] text-white/50 mt-0.5">Regras determinísticas de estabelecimentos são aplicadas primeiro, seguidas por IA Naive Bayes.</p>
           </div>
-        </div>
+        </Card>
 
-        <div class="bg-surface/60 rounded-xl p-4 border border-white/5 flex items-start gap-3">
+        <Card class="p-4 flex items-start gap-3 bg-surface/60">
           <div class="w-8 h-8 rounded-lg bg-amber-500/15 text-amber-300 flex items-center justify-center shrink-0">
             <PhCreditCard :size="18" weight="duotone" />
           </div>
@@ -352,7 +356,7 @@ const resetForm = () => {
             <h3 class="text-xs font-bold text-white">Contas vs Cartões</h3>
             <p class="text-[11px] text-white/50 mt-0.5">Faturas de cartão de crédito não somam com o pagamento da fatura no débito da conta corrente.</p>
           </div>
-        </div>
+        </Card>
       </div>
     </div>
   </div>

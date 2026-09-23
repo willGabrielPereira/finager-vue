@@ -5,7 +5,9 @@ import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import CurrencyInput from './CurrencyInput.vue'
-import CategorySelect from './CategorySelect.vue'
+import { TagCombobox } from './tag-combobox'
+import { Button } from './button'
+import { Input } from './input'
 import { toast, showAlert } from '../../utils/feedback'
 import { 
   PhX, 
@@ -305,11 +307,11 @@ const handleDelete = async () => {
             <span>Descrição / Título</span>
             <span class="text-[10px] text-white/40 font-normal">Texto principal</span>
           </label>
-          <input
+          <Input
             v-model="name"
             type="text"
             placeholder="Nome ou descrição do lançamento"
-            class="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent transition-colors"
+            class="bg-slate-950 border-white/10"
           />
         </div>
 
@@ -342,7 +344,7 @@ const handleDelete = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <CategorySelect
+            <TagCombobox
               v-model="selectedTagId"
               placeholder="Sem Categoria"
               size="sm"
@@ -351,10 +353,10 @@ const handleDelete = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <input
+            <Input
               v-model="datePosted"
               type="date"
-              class="w-full bg-[#0b1329] border border-white/10 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:border-accent"
+              class="bg-[#0b1329] border-white/10 h-9 text-xs"
             />
           </div>
         </div>
@@ -420,35 +422,39 @@ const handleDelete = async () => {
 
       <!-- Rodapé Fixo de Ações -->
       <div class="px-5 py-3.5 border-t border-white/10 bg-surface flex items-center justify-between shrink-0 gap-3">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           @click="handleDelete"
           :disabled="deleteLoading"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400/80 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          class="text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20"
         >
-          <PhTrash :size="15" />
+          <PhTrash :size="15" class="mr-1.5" />
           <span>Excluir</span>
-        </button>
+        </Button>
 
         <div class="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             @click="emit('close')"
-            class="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            size="sm"
             @click="handleSave"
             :disabled="loading"
-            class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-bg font-bold text-xs shadow-md shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
+            class="bg-accent text-bg hover:bg-accent/90 font-bold shadow-md shadow-accent/20"
           >
-            <PhCircleNotch v-if="loading" :size="14" class="animate-spin" />
-            <PhFloppyDisk v-else :size="14" weight="bold" />
+            <PhCircleNotch v-if="loading" :size="14" class="animate-spin mr-1.5" />
+            <PhFloppyDisk v-else :size="14" weight="bold" class="mr-1.5" />
             <span>{{ loading ? 'Salvando...' : 'Salvar Alterações' }}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

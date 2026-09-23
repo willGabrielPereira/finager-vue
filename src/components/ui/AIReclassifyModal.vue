@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { PhSparkle, PhX, PhCircleNotch, PhCheckCircle } from '@phosphor-icons/vue'
+import { Button } from './button'
 
 defineProps<{
   isOpen: boolean
@@ -57,13 +58,13 @@ const handleConfirm = () => {
             Foram categorizadas <span class="text-accent font-bold text-sm">{{ resultCount }}</span> transações com sucesso.
           </p>
         </div>
-        <button
+        <Button
           type="button"
           @click="emit('close')"
-          class="mt-2 w-full py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer"
+          class="mt-2 w-full bg-accent text-bg font-bold text-xs hover:opacity-90"
         >
           Entendido
-        </button>
+        </Button>
       </div>
 
       <!-- Estado: Formulário de Confirmação -->
@@ -113,24 +114,26 @@ const handleConfirm = () => {
         </div>
 
         <div class="flex items-center justify-end gap-2 pt-2 border-t border-white/10">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             @click="emit('close')"
             :disabled="loading"
-            class="px-4 py-2 rounded-xl text-xs font-semibold text-white/60 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             @click="handleConfirm"
             :disabled="loading"
-            class="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-bold bg-accent text-bg hover:opacity-90 transition-all cursor-pointer disabled:opacity-50"
+            class="bg-accent text-bg hover:opacity-90 font-bold"
           >
-            <PhCircleNotch v-if="loading" :size="16" class="animate-spin" />
-            <PhSparkle v-else :size="16" weight="fill" />
+            <PhCircleNotch v-if="loading" :size="16" class="animate-spin mr-1.5" />
+            <PhSparkle v-else :size="16" weight="fill" class="mr-1.5" />
             <span>{{ loading ? 'Classificando...' : 'Iniciar Classificação' }}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

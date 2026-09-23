@@ -2,12 +2,13 @@
 import { ref, computed, onMounted } from 'vue'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import CurrencyInput from './CurrencyInput.vue'
-import CategorySelect from './CategorySelect.vue'
-import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
+import { TagCombobox } from './tag-combobox'
+import { Button } from './button'
+import { Input } from './input'
+import { PhBank, PhCreditCard, PhX, PhPlus, PhCircleNotch, PhCheck, PhClock } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import { useTransactionsStore } from '../../stores/transactions'
-import { PhX, PhPlus, PhCircleNotch, PhCheck, PhClock } from '@phosphor-icons/vue'
 
 defineProps<{
   isOpen: boolean
@@ -214,20 +215,18 @@ const submit = async () => {
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Estabelecimento / Descrição</label>
-            <input
+            <Input
               v-model="name"
               type="text"
               placeholder="Ex: Supermercado Extra"
-              class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent"
             />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Observação (Opcional)</label>
-            <input
+            <Input
               v-model="memo"
               type="text"
               placeholder="Ex: Compras do mês"
-              class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
@@ -246,19 +245,18 @@ const submit = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <CategorySelect
+            <TagCombobox
               v-model="selectedTagId"
-              placeholder="Sem Categoria"
-              size="md"
+              placeholder="Sem categoria"
             />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <input
+            <Input
               v-model="datePosted"
               type="date"
-              class="bg-slate-950 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-accent cursor-pointer"
+              class="cursor-pointer"
             />
           </div>
         </div>
@@ -294,23 +292,25 @@ const submit = async () => {
 
       <!-- Rodapé Fixo com Ações -->
       <div class="px-5 py-3 border-t border-white/10 flex items-center justify-end gap-3 flex-shrink-0 bg-surface/90 backdrop-blur-sm">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           @click="emit('close')"
-          class="px-4 py-2 text-xs font-semibold text-white/50 hover:text-white transition-colors cursor-pointer"
         >
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          size="sm"
           @click="submit"
           :disabled="loading"
-          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-lg shadow-accent/15"
+          class="gap-2 font-bold shadow-lg shadow-accent/15"
         >
           <PhCircleNotch v-if="loading" :size="16" class="animate-spin" />
           <PhPlus v-else :size="16" weight="bold" />
           <span>{{ loading ? 'Salvando...' : 'Criar Lançamento' }}</span>
-        </button>
+        </Button>
       </div>
     </div>
   </div>

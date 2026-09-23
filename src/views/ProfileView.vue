@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showAlert, toast } from '../utils/feedback'
@@ -11,23 +11,32 @@ import {
   PhLock, 
   PhCheckCircle, 
   PhWarningCircle, 
-  PhSignOut,
-  PhFloppyDisk,
-  PhKey,
-  PhCopy,
-  PhCheck,
-  PhBank,
-  PhUsers,
-  PhUserPlus,
-  PhTrash,
-  PhArrowRight,
-  PhEnvelopeSimple,
-  PhCrown,
-  PhLightning,
-  PhRocketLaunch,
-  PhShieldCheck,
-  PhX
+  PhSignOut, 
+  PhFloppyDisk, 
+  PhKey, 
+  PhCopy, 
+  PhCheck, 
+  PhBank, 
+  PhUsers, 
+  PhUserPlus, 
+  PhTrash, 
+  PhArrowRight, 
+  PhEnvelopeSimple, 
+  PhCrown, 
+  PhLightning, 
+  PhRocketLaunch, 
+  PhShieldCheck 
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 
 const authStore = useAuthStore()
 const billingStore = useBillingStore()
@@ -257,18 +266,19 @@ const formatDate = (dateStr?: string) => {
         </p>
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="destructive"
+        size="sm"
         @click="handleLogout"
-        class="flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold transition-all cursor-pointer"
+        class="gap-2 text-xs"
       >
         <PhSignOut :size="16" />
         <span>Sair da Conta</span>
-      </button>
+      </Button>
     </div>
 
     <!-- Banner do Usuário -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <Card class="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
       <div class="flex items-center gap-4">
         <div class="w-14 h-14 rounded-2xl bg-accent/20 border border-accent/30 text-accent flex items-center justify-center text-xl font-bold shadow-lg shadow-accent/10">
           {{ (authStore.user?.login || 'U').charAt(0).toUpperCase() }}
@@ -295,11 +305,11 @@ const formatDate = (dateStr?: string) => {
         <span>Gerenciar Contas Bancárias</span>
         <PhArrowRight :size="13" />
       </router-link>
-    </div>
+    </Card>
 
     
     <!-- Card Resumo do Plano & Quotas -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
+    <Card class="p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
       <div class="flex items-start sm:items-center gap-4 z-10">
         <div 
           class="w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0"
@@ -312,14 +322,15 @@ const formatDate = (dateStr?: string) => {
         <div>
           <div class="flex items-center gap-2">
             <span class="text-xs font-semibold text-white/50">Plano Atual</span>
-            <span 
-              class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider"
+            <Badge 
+              variant="outline"
+              class="text-[10px] font-bold uppercase tracking-wider"
               :class="billingStore.isPro 
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                 : 'bg-white/10 text-white/80 border-white/15'"
             >
               {{ billingStore.isPro ? 'Plano Pro' : 'Plano Free' }}
-            </span>
+            </Badge>
           </div>
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-white/70">
             <span>
@@ -348,10 +359,10 @@ const formatDate = (dateStr?: string) => {
         <span>{{ billingStore.isPro ? 'Gerenciar Plano' : 'Fazer Upgrade para Pro' }}</span>
         <PhArrowRight :size="13" />
       </router-link>
-    </div>
+    </Card>
 
     <!-- Seção Membros da Família & Convite Seguro -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+    <Card class="p-6 shadow-md flex flex-col gap-4">
       <div class="flex items-center justify-between pb-2 border-b border-white/5">
         <div class="flex items-center gap-2">
           <PhUsers :size="20" class="text-accent" weight="duotone" />
@@ -361,14 +372,14 @@ const formatDate = (dateStr?: string) => {
           </h3>
         </div>
 
-        <button
-          type="button"
+        <Button
+          size="sm"
           @click="openInviteModal"
-          class="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-md shadow-accent/15"
+          class="gap-1.5 font-bold shadow-md shadow-accent/15"
         >
           <PhUserPlus :size="15" weight="bold" />
           <span>Convidar Membro</span>
-        </button>
+        </Button>
       </div>
 
       <div v-if="authStore.familyMembers.length === 0" class="p-4 text-center text-xs text-white/40">
@@ -411,30 +422,31 @@ const formatDate = (dateStr?: string) => {
       <div class="mt-2 pt-4 border-t border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div class="flex-1">
           <label class="text-xs text-white/70 block mb-1">Recebeu um convite? Cole o código ou abra o link:</label>
-          <input
+          <Input
             v-model="joinToken"
             type="text"
             placeholder="Cole o código do convite aqui..."
-            class="w-full bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+            class="text-xs"
           />
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           @click="handleJoinFamily"
           :disabled="joinLoading"
-          class="sm:mt-5 py-2 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          class="sm:mt-5 font-semibold"
         >
           {{ joinLoading ? 'Entrando...' : 'Entrar na Família' }}
-        </button>
+        </Button>
       </div>
       <p v-if="joinSuccess" class="text-xs text-emerald-400 mt-1">{{ joinSuccess }}</p>
       <p v-if="joinError" class="text-xs text-rose-400 mt-1">{{ joinError }}</p>
-    </div>
+    </Card>
 
     <!-- Grid de Configurações -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Card 1: Dados Pessoais e Espaço Familiar -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+      <Card class="p-6 shadow-md flex flex-col gap-4">
         <div class="flex items-center gap-2 pb-2 border-b border-white/5">
           <PhUser :size="18" class="text-accent" weight="bold" />
           <h3 class="text-sm font-bold text-white">Dados de Identificação</h3>
@@ -443,30 +455,27 @@ const formatDate = (dateStr?: string) => {
         <form @submit.prevent="handleSaveProfile" class="flex flex-col gap-4">
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome de Usuário (Login)</label>
-            <input
+            <Input
               v-model="login"
               type="text"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">E-mail Cadastrado</label>
-            <input
+            <Input
               v-model="email"
               type="email"
               placeholder="ex: usuario@email.com"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da Família / Espaço</label>
-            <input
+            <Input
               v-model="familyName"
               type="text"
               placeholder="ex: Família Pereira"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
@@ -480,19 +489,20 @@ const formatDate = (dateStr?: string) => {
             <span>{{ profileError }}</span>
           </div>
 
-          <button
+          <Button
             type="submit"
+            size="sm"
             :disabled="profileLoading"
-            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/15 disabled:opacity-50 mt-1"
+            class="gap-2 font-bold shadow-lg shadow-accent/15 mt-1"
           >
             <PhFloppyDisk :size="16" weight="bold" />
             <span>{{ profileLoading ? 'Salvando...' : 'Salvar Alterações' }}</span>
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
       <!-- Card 2: Segurança e Senha -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+      <Card class="p-6 shadow-md flex flex-col gap-4">
         <div class="flex items-center gap-2 pb-2 border-b border-white/5">
           <PhLock :size="18" class="text-accent" weight="bold" />
           <h3 class="text-sm font-bold text-white">Alterar Senha</h3>
@@ -501,31 +511,28 @@ const formatDate = (dateStr?: string) => {
         <form @submit.prevent="handleChangePassword" class="flex flex-col gap-4">
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual</label>
-            <input
+            <Input
               v-model="currentPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nova Senha (mínimo 8 caracteres)</label>
-            <input
+            <Input
               v-model="newPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Confirmar Nova Senha</label>
-            <input
+            <Input
               v-model="confirmPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
@@ -539,20 +546,22 @@ const formatDate = (dateStr?: string) => {
             <span>{{ passwordError }}</span>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="secondary"
+            size="sm"
             :disabled="passwordLoading"
-            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 mt-1"
+            class="gap-2 font-bold mt-1"
           >
             <PhKey :size="16" />
             <span>{{ passwordLoading ? 'Alterando...' : 'Atualizar Senha' }}</span>
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
 
-        <!-- Zona de Privacidade e Direitos LGPD -->
-    <div class="bg-surface rounded-2xl p-6 border border-red-500/20 shadow-xl flex flex-col gap-4">
+    <!-- Zona de Privacidade e Direitos LGPD -->
+    <Card class="p-6 border-red-500/20 shadow-xl flex flex-col gap-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 class="text-sm font-bold text-red-400 flex items-center gap-2">
@@ -563,34 +572,26 @@ const formatDate = (dateStr?: string) => {
             Em conformidade com a Lei Geral de Proteção de Dados, você tem o direito de excluir permanentemente seus acessos, contas bancárias, extratos e histórico financeiro.
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="destructive"
+          size="sm"
           @click="openDeleteAccountModal"
-          class="shrink-0 px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 text-xs font-bold transition-all cursor-pointer">
+          class="shrink-0"
+        >
           <span>Excluir Minha Conta</span>
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
 
     <!-- Modal de Convite Seguro -->
-    <div
-      v-if="isInviteModalOpen"
-      class="fixed inset-0 z-[10000] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      @click="isInviteModalOpen = false"
-    >
-      <div 
-        class="w-full max-w-md bg-surface border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150"
-        @click.stop
-      >
-        <div class="flex items-center justify-between pb-3 border-b border-white/10">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+    <Dialog v-model:open="isInviteModalOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2 text-sm font-bold text-white">
             <PhShieldCheck :size="18" class="text-accent" weight="duotone" />
             <span>Convidar Membro para a Família</span>
-          </h3>
-          <button @click="isInviteModalOpen = false" class="text-white/40 hover:text-white transition-colors cursor-pointer">
-            <PhX :size="18" />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         <div v-if="!generatedInvite" class="flex flex-col gap-4">
           <p class="text-xs text-white/60 leading-relaxed">
@@ -602,11 +603,10 @@ const formatDate = (dateStr?: string) => {
               <PhEnvelopeSimple :size="14" class="text-accent" />
               <span>E-mail do Convidado (Recomendado para Segurança)</span>
             </label>
-            <input
+            <Input
               v-model="inviteTargetEmail"
               type="email"
               placeholder="ex: parceiro@email.com (opcional)"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
             <p class="text-[11px] text-white/40 mt-1">
               Se informado, apenas uma conta com este e-mail poderá aceitar o convite, impedindo qualquer entrada indevida.
@@ -619,22 +619,24 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="isInviteModalOpen = false"
-              class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-medium cursor-pointer"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
               @click="handleCreateInvite"
               :disabled="inviteLoading"
-              class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 cursor-pointer disabled:opacity-50 shadow-lg shadow-accent/20"
+              class="gap-1.5 font-bold shadow-lg shadow-accent/20"
             >
               <PhShieldCheck :size="15" weight="bold" />
               <span>{{ inviteLoading ? 'Gerando Link...' : 'Gerar Convite Criptografado' }}</span>
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -647,20 +649,21 @@ const formatDate = (dateStr?: string) => {
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">Link de Cadastro Direto:</label>
             <div class="flex items-center gap-2">
-              <input
+              <Input
                 :value="generatedInvite.link"
                 readonly
-                class="flex-1 bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white/80 font-mono truncate"
+                class="flex-1 font-mono text-xs truncate"
               />
-              <button
+              <Button
                 type="button"
+                size="sm"
                 @click="copyInviteLink"
-                class="px-3.5 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 flex items-center gap-1.5 cursor-pointer shadow-md shadow-accent/15"
+                class="gap-1.5 font-bold shadow-md shadow-accent/15"
               >
                 <PhCheck v-if="copiedInvite" :size="14" weight="bold" />
                 <PhCopy v-else :size="14" weight="bold" />
                 <span>{{ copiedInvite ? 'Copiado!' : 'Copiar' }}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -670,17 +673,19 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div class="flex justify-end pt-1">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               @click="isInviteModalOpen = false"
-              class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold cursor-pointer"
             >
               Concluir
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
+
     <DeleteAccountModal :is-open="isDeleteModalOpen" @close="isDeleteModalOpen = false" />
   </div>
 </template>

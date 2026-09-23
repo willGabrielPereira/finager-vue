@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
@@ -10,6 +10,9 @@ import {
   PhEnvelopeSimple, 
   PhShieldCheck 
 } from '@phosphor-icons/vue'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 const auth = useAuthStore()
 const router = useRouter()
@@ -99,7 +102,7 @@ const handleRegister = async () => {
 
 <template>
   <div class="min-h-screen w-full flex items-center justify-center p-4 bg-bg">
-    <div class="max-w-md w-full bg-surface rounded-2xl p-6 sm:p-8 border border-white/5 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.5)]">
+    <Card class="max-w-md w-full p-6 sm:p-8">
       <div class="flex justify-center mb-5 text-accent">
         <div class="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center shadow-lg shadow-accent/10">
           <PhWallet :size="32" weight="duotone" />
@@ -130,12 +133,11 @@ const handleRegister = async () => {
             <PhUserPlus :size="14" />
             <span>Nome de Usuário</span>
           </label>
-          <input 
+          <Input 
             v-model="login"
             type="text" 
             placeholder="ex: william"
             autocomplete="username"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all" 
             required
           />
         </div>
@@ -146,13 +148,12 @@ const handleRegister = async () => {
             <PhEnvelopeSimple :size="14" />
             <span>Endereço de E-mail</span>
           </label>
-          <input 
+          <Input 
             v-model="email"
             type="email" 
             placeholder="ex: william@email.com"
             autocomplete="email"
             :disabled="emailLocked"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all disabled:opacity-60 disabled:cursor-not-allowed" 
             required
           />
           <p v-if="emailLocked" class="text-[10px] text-accent mt-1">E-mail vinculado exclusivamente a este convite de família.</p>
@@ -164,11 +165,10 @@ const handleRegister = async () => {
             <PhHouse :size="14" />
             <span>Nome da Família / Espaço (opcional)</span>
           </label>
-          <input 
+          <Input 
             v-model="familyName"
             type="text" 
             placeholder="ex: Família Pereira"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all" 
           />
         </div>
         
@@ -178,12 +178,11 @@ const handleRegister = async () => {
             <PhLock :size="14" />
             <span>Senha (mínimo 8 caracteres)</span>
           </label>
-          <input 
+          <Input 
             v-model="password"
             type="password" 
             placeholder="••••••••"
             autocomplete="new-password"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all" 
             required
           />
         </div>
@@ -194,12 +193,11 @@ const handleRegister = async () => {
             <PhLock :size="14" />
             <span>Confirme a Senha</span>
           </label>
-          <input 
+          <Input 
             v-model="confirmPassword"
             type="password" 
             placeholder="••••••••"
             autocomplete="new-password"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all" 
             required
           />
         </div>
@@ -208,20 +206,22 @@ const handleRegister = async () => {
           {{ errorMsg }}
         </div>
         
-        <button 
+        <Button 
           type="submit"
           :disabled="loading || validatingInvite"
-          class="bg-accent text-bg mt-2 font-bold px-6 py-3 rounded-xl hover:opacity-90 active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-accent/20 text-sm"
+          size="lg"
+          class="mt-2 w-full"
         >
           <span v-if="loading">Criando conta...</span>
           <span v-else>Cadastrar e Entrar</span>
-        </button>
+        </Button>
       </form>
       
       <div class="mt-6 text-center text-xs sm:text-sm text-white/50">
         Já tem uma conta? 
         <router-link to="/login" class="text-accent font-semibold hover:underline">Faça login</router-link>
       </div>
-    </div>
+    </Card>
   </div>
 </template>
+

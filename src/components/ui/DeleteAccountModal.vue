@@ -4,6 +4,8 @@ import { PhWarning, PhLock, PhTrash, PhX, PhShieldWarning } from '@phosphor-icon
 import { useAuthStore } from '../../stores/auth'
 import { useRouter } from 'vue-router'
 import { toast } from '../../utils/feedback'
+import { Button } from './button'
+import { Input } from './input'
 
 const props = defineProps<{
   isOpen: boolean
@@ -101,13 +103,13 @@ const handleDelete = async () => {
             <PhLock :size="14" class="text-red-400" />
             <span>Digite sua senha para confirmar:</span>
           </label>
-          <input 
+          <Input 
             v-model="password"
             type="password"
             placeholder="Sua senha atual"
             autocomplete="current-password"
             autofocus
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/20 text-xs focus:outline-none focus:ring-2 focus:ring-red-500/50 focus:border-red-500 transition-all"
+            class="bg-bg border-white/10"
             required
           />
         </div>
@@ -119,23 +121,26 @@ const handleDelete = async () => {
 
         <!-- Action Buttons -->
         <div class="flex items-center justify-end gap-2.5 pt-2 border-t border-white/5">
-          <button
+          <Button
             type="button"
+            variant="ghost"
+            size="sm"
             @click="$emit('close')"
-            class="px-4 py-2.5 rounded-xl text-xs font-semibold text-white/70 hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="submit"
+            variant="destructive"
+            size="sm"
             :disabled="!isFormValid() || loading"
-            class="px-5 py-2.5 rounded-xl text-xs font-bold bg-red-500 text-white hover:bg-red-600 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2 shadow-lg shadow-red-500/20"
+            class="shadow-lg shadow-red-500/20 font-bold"
           >
-            <PhTrash :size="15" weight="bold" />
+            <PhTrash :size="15" weight="bold" class="mr-1.5" />
             <span v-if="loading">Excluindo permanentemente...</span>
             <span v-else>Confirmar Exclusão Definitiva</span>
-          </button>
+          </Button>
         </div>
       </form>
     </div>

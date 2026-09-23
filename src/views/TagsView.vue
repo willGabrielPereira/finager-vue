@@ -8,11 +8,20 @@ import {
   PhTrash, 
   PhPencilSimple,
   PhLock,
-  PhX, 
   PhCheck, 
   PhCircleNotch,
   PhMagnifyingGlass 
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription
+} from '@/components/ui/dialog'
 
 const tagsStore = useTagsStore()
 
@@ -132,39 +141,39 @@ const handleDelete = async (tag: Tag) => {
       </div>
 
       <div class="flex items-center gap-3">
-        <button
-          type="button"
+        <Button
+          size="sm"
           @click="openCreateModal"
-          class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20 hover:scale-105 active:scale-95"
+          class="gap-1.5 font-bold shadow-lg shadow-accent/20"
         >
           <PhPlus :size="16" weight="bold" />
           <span>Nova Categoria</span>
-        </button>
+        </Button>
       </div>
     </div>
 
     <!-- Barra de Pesquisa -->
-    <div class="bg-surface p-3 rounded-2xl border border-white/5 flex items-center justify-between">
+    <Card class="p-3 flex items-center justify-between gap-4">
       <div class="relative w-full max-w-sm">
-        <PhMagnifyingGlass class="absolute left-3 top-2.5 text-white/40" :size="16" />
-        <input
+        <PhMagnifyingGlass class="absolute left-3 top-2.5 text-white/40 z-10" :size="16" />
+        <Input
           v-model="searchQuery"
           type="text"
           placeholder="Buscar categorias cadastradas..."
-          class="w-full bg-slate-950 border border-white/10 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent transition-colors"
+          class="pl-9 pr-3 text-xs"
         />
       </div>
-      <div class="text-xs text-white/40">
+      <div class="text-xs text-white/40 shrink-0">
         Total: <span class="text-white font-bold">{{ filteredTags.length }}</span> categorias
       </div>
-    </div>
+    </Card>
 
     <!-- Grid de Tags -->
     <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-      <div
+      <Card
         v-for="tag in filteredTags"
         :key="tag.id"
-        class="bg-surface p-4 rounded-2xl border border-white/5 hover:border-white/15 transition-all flex items-center justify-between group shadow-sm"
+        class="p-4 hover:border-white/15 transition-all flex items-center justify-between group shadow-sm"
         :class="{ 'cursor-pointer hover:bg-white/[0.02]': !tag.is_system }"
         @click="!tag.is_system && openEditModal(tag)"
       >
@@ -216,35 +225,20 @@ const handleDelete = async (tag: Tag) => {
             </button>
           </template>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Modal: Criar / Editar Tag -->
-    <div
-      v-if="isModalOpen"
-      class="fixed inset-0 z-[10002] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200"
-      @click="isModalOpen = false"
-    >
-      <div
-        class="bg-surface border border-white/10 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl p-6 relative flex flex-col gap-4 text-white animate-in zoom-in-95 duration-200"
-        @click.stop
-      >
-        <button
-          @click="isModalOpen = false"
-          class="absolute top-4 right-4 text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5 cursor-pointer"
-          title="Fechar"
-        >
-          <PhX :size="20" />
-        </button>
-
-        <div>
-          <h3 class="text-lg font-bold">
+    <Dialog v-model:open="isModalOpen">
+      <DialogContent class="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>
             {{ modalMode === 'create' ? 'Nova Categoria' : 'Editar Categoria' }}
-          </h3>
-          <p class="text-xs text-white/50">
+          </DialogTitle>
+          <DialogDescription>
             {{ modalMode === 'create' ? 'Crie uma tag para organizar seus gastos' : 'Altere o nome e a cor de identificação' }}
-          </p>
-        </div>
+          </DialogDescription>
+        </DialogHeader>
 
         <!-- Live Preview do Badge -->
         <div class="p-3 rounded-xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
@@ -268,11 +262,10 @@ const handleDelete = async (tag: Tag) => {
 
         <div class="flex flex-col gap-1.5">
           <label class="text-xs font-semibold text-white/70">Nome da Categoria</label>
-          <input
+          <Input
             v-model="formTagName"
             type="text"
             placeholder="Ex: Assinaturas, Hobbies..."
-            class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2.5 text-xs text-white focus:outline-none focus:border-accent"
             @keydown.enter="handleSubmit"
           />
         </div>
@@ -307,26 +300,28 @@ const handleDelete = async (tag: Tag) => {
         </div>
 
         <div class="flex items-center justify-end gap-2 pt-3 border-t border-white/10">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             @click="isModalOpen = false"
-            class="px-4 py-2 text-xs font-semibold text-white/50 hover:text-white transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
+            size="sm"
             @click="handleSubmit"
             :disabled="saving || !formTagName.trim()"
-            class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+            class="gap-2 font-bold"
           >
             <PhCircleNotch v-if="saving" :size="16" class="animate-spin" />
             <PhCheck v-else-if="modalMode === 'edit'" :size="16" weight="bold" />
             <PhPlus v-else :size="16" weight="bold" />
             <span>{{ saving ? 'Salvando...' : (modalMode === 'edit' ? 'Salvar Alterações' : 'Salvar Categoria') }}</span>
-          </button>
+          </Button>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

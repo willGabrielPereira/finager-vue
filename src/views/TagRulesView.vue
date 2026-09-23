@@ -3,7 +3,6 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/axios'
 import { useTagsStore } from '../stores/tags'
 import { showAlert, toast } from '../utils/feedback'
-import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
 import { 
   PhListDashes, 
   PhPlus, 
@@ -11,9 +10,18 @@ import {
   PhMagnifyingGlass, 
   PhShieldCheck,
   PhStorefront,
-  PhX,
   PhArrowRight
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { TagCombobox } from '@/components/ui/tag-combobox'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 
 interface MerchantRule {
   id: string
@@ -38,15 +46,6 @@ const errorMsg = ref('')
 
 const newPattern = ref('')
 const newTagId = ref('')
-
-const tagOptions = computed<AppSelectOption[]>(() => {
-  return tagsStore.tags.map(tag => ({
-    value: tag.id,
-    label: tag.name,
-    color: tag.color || '#10b981'
-  }))
-})
-
 
 const fetchRules = async () => {
   loading.value = true
@@ -136,18 +135,18 @@ const handleDeleteRule = async (id: string) => {
         </p>
       </div>
 
-      <button
-        type="button"
+      <Button
+        size="sm"
         @click="isCreateModalOpen = true"
-        class="flex items-center justify-center gap-2 h-10 px-4 rounded-xl bg-accent text-bg font-bold text-xs sm:text-sm hover:opacity-90 active:scale-95 transition-all cursor-pointer shadow-lg shadow-accent/15 whitespace-nowrap shrink-0"
+        class="gap-2 font-bold shadow-lg shadow-accent/15 shrink-0"
       >
         <PhPlus :size="16" weight="bold" />
         <span>Nova Regra</span>
-      </button>
+      </Button>
     </div>
 
     <!-- Explicação das Camadas -->
-    <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <Card class="p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div class="flex items-center gap-3">
         <div class="w-10 h-10 rounded-xl bg-accent/15 text-accent flex items-center justify-center border border-accent/25">
           <PhShieldCheck :size="22" weight="duotone" />
@@ -162,21 +161,21 @@ const handleDeleteRule = async (id: string) => {
       <div class="px-3 py-1.5 rounded-xl bg-white/5 text-white/60 text-xs font-mono border border-white/5">
         {{ rules.length }} regras cadastradas
       </div>
-    </div>
+    </Card>
 
     <!-- Barra de Busca -->
     <div class="relative">
-      <PhMagnifyingGlass :size="18" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40" />
-      <input
+      <PhMagnifyingGlass :size="18" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 z-10" />
+      <Input
         v-model="searchQuery"
         type="text"
         placeholder="Buscar regra por estabelecimento ou tag..."
-        class="w-full bg-surface border border-white/10 rounded-xl pl-10 pr-4 py-2.5 text-xs sm:text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
+        class="pl-10 pr-4 text-xs sm:text-sm"
       />
     </div>
 
     <!-- Lista de Regras -->
-    <div class="bg-surface rounded-2xl border border-white/5 shadow-md overflow-hidden">
+    <Card class="overflow-hidden shadow-md">
       <div v-if="loading" class="p-12 text-center text-white/40 text-sm">
         Carregando regras...
       </div>
@@ -238,41 +237,28 @@ const handleDeleteRule = async (id: string) => {
           </button>
         </div>
       </div>
-    </div>
+    </Card>
 
     <!-- Modal Nova Regra -->
-    <div
-      v-if="isCreateModalOpen"
-      class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in"
-      @click.self="isCreateModalOpen = false"
-    >
-      <div class="bg-surface rounded-2xl w-full max-w-md border border-white/10 shadow-2xl p-6 flex flex-col gap-5">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <div class="w-8 h-8 rounded-lg bg-accent/20 text-accent flex items-center justify-center">
-              <PhPlus :size="18" weight="bold" />
-            </div>
-            <h3 class="text-base font-bold text-white">Nova Regra de Estabelecimento</h3>
-          </div>
-          <button
-            type="button"
-            @click="isCreateModalOpen = false"
-            class="text-white/40 hover:text-white p-1 rounded-lg"
-          >
-            <PhX :size="18" />
-          </button>
-        </div>
+    <Dialog v-model:open="isCreateModalOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2 text-sm font-bold text-white">
+            <PhPlus :size="18" weight="bold" class="text-accent" />
+            <span>Nova Regra de Estabelecimento</span>
+          </DialogTitle>
+        </DialogHeader>
 
         <form @submit.prevent="handleCreateRule" class="flex flex-col gap-4">
           <div>
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">
               Padrão do Estabelecimento (busca contida no extrato)
             </label>
-            <input
+            <Input
               v-model="newPattern"
               type="text"
               placeholder="ex: UBER, IFOOD, POSTO SHELL"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent uppercase font-mono"
+              class="uppercase font-mono"
             />
             <span class="text-[10px] text-white/40 mt-1 block">
               Qualquer transação cujo nome contenha esse texto receberá a tag abaixo.
@@ -283,11 +269,9 @@ const handleDeleteRule = async (id: string) => {
             <label class="text-xs font-semibold text-white/80 mb-1.5 block">
               Categoria / Tag Vinculada
             </label>
-            <AppSelect
+            <TagCombobox
               v-model="newTagId"
-              :options="tagOptions"
               placeholder="Selecione uma categoria..."
-              size="md"
             />
           </div>
 
@@ -296,24 +280,26 @@ const handleDeleteRule = async (id: string) => {
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="isCreateModalOpen = false"
-              class="px-4 py-2 rounded-xl text-xs font-semibold text-white/70 hover:bg-white/5 transition-all"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              size="sm"
               :disabled="submitting || !newPattern.trim() || !newTagId"
-              class="px-5 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-md shadow-accent/15"
+              class="font-bold"
             >
               <span v-if="submitting">Salvando...</span>
               <span v-else>Salvar Regra</span>
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

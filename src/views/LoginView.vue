@@ -1,8 +1,11 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import { useRouter } from 'vue-router';
 import { PhWallet, PhUser, PhLock, PhSignIn } from '@phosphor-icons/vue';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const auth = useAuthStore();
 const router = useRouter();
@@ -30,7 +33,7 @@ const handleLogin = async () => {
 
 <template>
   <div class="min-h-screen w-full flex items-center justify-center p-4 bg-bg">
-    <div class="max-w-md w-full bg-surface rounded-2xl p-6 sm:p-8 border border-white/5 shadow-[0_20px_25px_-5px_rgba(0,0,0,0.5)]">
+    <Card class="max-w-md w-full p-6 sm:p-8">
       <div class="flex justify-center mb-5 text-accent">
         <div class="w-14 h-14 rounded-2xl bg-accent/15 border border-accent/30 flex items-center justify-center shadow-lg shadow-accent/10">
           <PhWallet :size="32" weight="duotone" />
@@ -46,12 +49,11 @@ const handleLogin = async () => {
             <PhUser :size="14" />
             <span>Nome de Usuário ou E-mail</span>
           </label>
-          <input 
+          <Input 
             v-model="login"
             type="text" 
             placeholder="Digite seu usuário ou e-mail"
             autocomplete="username"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all duration-200" 
             required
           />
         </div>
@@ -61,12 +63,11 @@ const handleLogin = async () => {
             <PhLock :size="14" />
             <span>Senha</span>
           </label>
-          <input 
+          <Input 
             v-model="password"
             type="password" 
             placeholder="••••••••"
             autocomplete="current-password"
-            class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-white placeholder-white/25 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all duration-200" 
             required
           />
         </div>
@@ -75,21 +76,23 @@ const handleLogin = async () => {
           {{ errorMsg }}
         </div>
         
-        <button 
+        <Button 
           type="submit"
           :disabled="loading"
-          class="bg-accent text-bg mt-2 font-bold px-6 py-3 rounded-xl hover:opacity-90 active:scale-[0.99] transition-all duration-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-accent/20 text-sm flex items-center justify-center gap-2"
+          size="lg"
+          class="mt-2 w-full"
         >
           <PhSignIn :size="16" weight="bold" />
           <span v-if="loading">Entrando...</span>
           <span v-else>Entrar</span>
-        </button>
+        </Button>
       </form>
       
       <div class="mt-6 text-center text-xs sm:text-sm text-white/50">
         Não tem uma conta? 
         <router-link to="/register" class="text-accent font-semibold hover:underline">Cadastre-se aqui</router-link>
       </div>
-    </div>
+    </Card>
   </div>
 </template>
+
