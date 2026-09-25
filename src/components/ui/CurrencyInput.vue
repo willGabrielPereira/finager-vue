@@ -7,6 +7,7 @@ const props = withDefaults(
     modelValue: number | '' | null
     placeholder?: string
     disabled?: boolean
+    id?: string
   }>(),
   {
     placeholder: '0,00',
@@ -45,11 +46,12 @@ watch(
 
 <template>
   <div class="relative w-full">
-    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/40 pointer-events-none select-none">
+    <span class="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm font-bold text-white/50 pointer-events-none select-none">
       R$
     </span>
     <input
       ref="inputRef"
+      :id="id"
       type="text"
       inputmode="decimal"
       :placeholder="placeholder"

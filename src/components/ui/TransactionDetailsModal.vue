@@ -1,12 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, markRaw } from 'vue'
 import { type Transaction, useTransactionsStore } from '../../stores/transactions'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import CurrencyInput from './CurrencyInput.vue'
-import CategorySelect from './CategorySelect.vue'
+import { TagCombobox } from './tag-combobox'
+import { Button } from './button'
+import { Input } from './input'
+import { DatePicker } from './date-picker'
 import { toast, showAlert } from '../../utils/feedback'
+import { useEscapeKey } from '@/composables/useEscapeKey'
+import { positiveAmountSchema } from '@/validation/schemas'
 import { 
   PhX, 
   PhArrowUpRight, 
@@ -47,7 +52,8 @@ const status = ref<'POSTED' | 'PLANNED' | 'PENDING_RECONCILIATION' | 'RECONCILED
 const loading = ref(false)
 const deleteLoading = ref(false)
 const errorMessage = ref('')
-const successMessage = ref('')
+
+useEscapeKey(() => props.isOpen && !!props.transaction, () => emit('close'))
 
 // Gesto de fechar no mobile (drag-to-dismiss)
 const translateY = ref(0)
@@ -110,7 +116,6 @@ watch(
       }
 
       errorMessage.value = ''
-      successMessage.value = ''
       translateY.value = 0
     }
   },
@@ -123,7 +128,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     label: acc.name,
     sublabel: acc.institution,
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+    icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
   }))
 })
 
@@ -141,17 +146,17 @@ const formatDatePretty = (isoStr: string) => {
 
 const handleSave = async () => {
   if (!props.transaction) return
-  if (!amount.value || Number(amount.value) <= 0) {
-    errorMessage.value = 'Informe um valor válido.'
+  const amountCheck = positiveAmountSchema.safeParse(amount.value)
+  if (!amountCheck.success) {
+    errorMessage.value = amountCheck.error.issues[0].message
     return
   }
 
   loading.value = true
   errorMessage.value = ''
-  successMessage.value = ''
 
   try {
-    const finalAmount = type.value === 'DEBIT' ? -Math.abs(Number(amount.value)) : Math.abs(Number(amount.value))
+    const finalAmount = type.value === 'DEBIT' ? -Math.abs(amountCheck.data) : Math.abs(amountCheck.data)
     const tagsArray = selectedTagId.value ? [selectedTagId.value] : []
 
     const payload: Record<string, any> = {
@@ -166,11 +171,9 @@ const handleSave = async () => {
     }
 
     const updated = await txStore.updateTransaction(props.transaction.id, payload)
-    successMessage.value = 'Transação atualizada com sucesso!'
+    toast.success('Alterações salvas.')
     emit('updated', updated || { ...props.transaction, ...payload })
-    setTimeout(() => {
-      emit('close')
-    }, 600)
+    emit('close')
   } catch (err: any) {
     console.error('Falha ao salvar detalhes:', err)
     errorMessage.value = err.response?.data?.message || err.response?.data?.error || 'Erro ao salvar alterações da transação.'
@@ -217,6 +220,9 @@ const handleDelete = async () => {
         transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,
         transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
       }"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="tx-details-title"
       @click.stop
     >
       <!-- Barra Mobile Drag indicator com suporte a arrastar para fechar -->
@@ -245,16 +251,17 @@ const handleDelete = async () => {
             <PhArrowDownRight v-else :size="18" weight="bold" />
           </div>
           <div class="min-w-0">
-            <h2 class="text-sm sm:text-base font-bold text-white truncate">Detalhes da Transação</h2>
-            <p class="text-[11px] text-white/50 truncate">Visualize e edite todas as informações</p>
+            <h2 id="tx-details-title" class="text-sm sm:text-base font-bold text-white truncate">Detalhes da Transação</h2>
+            <p class="text-[11px] text-white/50 truncate">Veja e edite as informações</p>
           </div>
         </div>
 
         <button 
           type="button"
           @click="emit('close')" 
-          class="text-white/40 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+          class="text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           title="Fechar"
+          aria-label="Fechar"
         >
           <PhX :size="18" />
         </button>
@@ -262,12 +269,9 @@ const handleDelete = async () => {
 
       <!-- Corpo Rolável com Todas as Informações Completas -->
       <div class="px-5 py-4 overflow-y-auto flex-1 flex flex-col gap-4">
-        <!-- Mensagens de Sucesso ou Erro -->
-        <div v-if="errorMessage" class="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+        <!-- Mensagem de Erro -->
+        <div v-if="errorMessage" role="alert" class="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
           {{ errorMessage }}
-        </div>
-        <div v-if="successMessage" class="p-3 rounded-xl bg-accent/10 border border-accent/20 text-accent text-xs">
-          {{ successMessage }}
         </div>
 
         <!-- Seletor Tipo: Despesa vs Receita -->
@@ -292,8 +296,9 @@ const handleDelete = async () => {
 
         <!-- Campo: Valor com Máscara Monetária -->
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold text-white/70">Valor</label>
+          <label for="tx-details-amount" class="text-xs font-semibold text-white/70">Valor</label>
           <CurrencyInput
+            id="tx-details-amount"
             v-model="amount"
             placeholder="0,00"
           />
@@ -301,36 +306,32 @@ const handleDelete = async () => {
 
         <!-- Campo: Nome / Descrição Completa -->
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold text-white/70 flex items-center justify-between">
-            <span>Descrição / Título</span>
-            <span class="text-[10px] text-white/40 font-normal">Texto principal</span>
-          </label>
-          <input
+          <label for="tx-details-name" class="text-xs font-semibold text-white/70">Descrição</label>
+          <Input
+            id="tx-details-name"
             v-model="name"
             type="text"
             placeholder="Nome ou descrição do lançamento"
-            class="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent transition-colors"
+            class="bg-slate-950 border-white/10"
           />
         </div>
 
         <!-- Campo: Estabelecimento / Memo / Detalhes OFX Completos -->
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold text-white/70 flex items-center justify-between">
-            <span>Estabelecimento / Memorando (OFX)</span>
-            <span class="text-[10px] text-white/40 font-normal">Texto completo do banco</span>
-          </label>
+          <label for="tx-details-memo" class="text-xs font-semibold text-white/70">Observação</label>
           <textarea
+            id="tx-details-memo"
             v-model="memo"
             rows="2"
-            placeholder="Estabelecimento ou dados adicionais do extrato"
-            class="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent transition-colors resize-none"
+            placeholder="Texto do banco ou anotação sua"
+            class="w-full bg-slate-950 border border-white/10 rounded-xl px-3.5 py-2.5 text-base sm:text-sm text-white placeholder-white/30 focus:outline-none focus:border-accent transition-colors resize-none"
           ></textarea>
         </div>
 
         <!-- Grid: Conta, Categoria e Data -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-semibold text-white/70">Conta Bancária</label>
+            <label class="text-xs font-semibold text-white/70">Conta</label>
             <AppSelect
               v-model="accountId"
               :options="accountOptions"
@@ -342,7 +343,7 @@ const handleDelete = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <CategorySelect
+            <TagCombobox
               v-model="selectedTagId"
               placeholder="Sem Categoria"
               size="sm"
@@ -351,30 +352,29 @@ const handleDelete = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <input
+            <DatePicker
               v-model="datePosted"
-              type="date"
-              class="w-full bg-[#0b1329] border border-white/10 rounded-xl px-3 h-9 text-xs text-white focus:outline-none focus:border-accent"
+              class="bg-[#0b1329] border-white/10 h-9 text-xs"
             />
           </div>
         </div>
 
         <!-- Seletor de Status -->
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-white/70">Situação / Status</label>
+          <label class="text-xs font-semibold text-white/70">Situação</label>
           <div class="grid grid-cols-3 gap-2 bg-white/5 p-1 rounded-xl text-xs">
             <button
               type="button"
               @click="status = 'POSTED'"
-              class="py-1.5 px-2 rounded-lg font-medium transition-all text-center"
+              class="py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer"
               :class="status === 'POSTED' ? 'bg-white/15 text-white font-bold' : 'text-white/50 hover:text-white'"
             >
-              Confirmada
+              Efetivada
             </button>
             <button
               type="button"
               @click="status = 'PLANNED'"
-              class="py-1.5 px-2 rounded-lg font-medium transition-all text-center"
+              class="py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer"
               :class="status === 'PLANNED' ? 'bg-amber-500/20 text-amber-400 font-bold' : 'text-white/50 hover:text-white'"
             >
               Prevista
@@ -382,7 +382,7 @@ const handleDelete = async () => {
             <button
               type="button"
               @click="status = 'RECONCILED'"
-              class="py-1.5 px-2 rounded-lg font-medium transition-all text-center"
+              class="py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer"
               :class="status === 'RECONCILED' ? 'bg-blue-500/20 text-blue-400 font-bold' : 'text-white/50 hover:text-white'"
             >
               Conciliada
@@ -399,19 +399,19 @@ const handleDelete = async () => {
 
           <div class="grid grid-cols-2 gap-2 pt-1 border-t border-white/5">
             <div>
-              <span class="block text-white/30 text-[10px]">Origem:</span>
+              <span class="block text-white/50 text-[10px]">Origem:</span>
               <span class="font-medium text-white/70">{{ transaction.source || 'OFX / Importado' }}</span>
             </div>
             <div>
-              <span class="block text-white/30 text-[10px]">Classificação:</span>
+              <span class="block text-white/50 text-[10px]">Classificação:</span>
               <span class="font-medium text-white/70">{{ transaction.manually_tagged ? 'Manual' : 'Automática (IA/Regra)' }}</span>
             </div>
             <div v-if="transaction.fitid" class="col-span-2">
-              <span class="block text-white/30 text-[10px]">Identificador Bancário (FITID):</span>
+              <span class="block text-white/50 text-[10px]">Identificador Bancário (FITID):</span>
               <span class="font-mono text-[10px] text-white/60 break-all select-all">{{ transaction.fitid }}</span>
             </div>
             <div v-if="transaction.imported_at" class="col-span-2">
-              <span class="block text-white/30 text-[10px]">Importado em:</span>
+              <span class="block text-white/50 text-[10px]">Importado em:</span>
               <span class="text-white/60">{{ formatDatePretty(transaction.imported_at) }}</span>
             </div>
           </div>
@@ -420,35 +420,39 @@ const handleDelete = async () => {
 
       <!-- Rodapé Fixo de Ações -->
       <div class="px-5 py-3.5 border-t border-white/10 bg-surface flex items-center justify-between shrink-0 gap-3">
-        <button
+        <Button
           type="button"
+          variant="ghost"
+          size="sm"
           @click="handleDelete"
           :disabled="deleteLoading"
-          class="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold text-red-400/80 hover:text-red-400 hover:bg-red-500/10 border border-transparent hover:border-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          class="text-red-400 hover:text-red-300 hover:bg-red-500/10 border border-transparent hover:border-red-500/20"
         >
-          <PhTrash :size="15" />
+          <PhTrash :size="15" class="mr-1.5" />
           <span>Excluir</span>
-        </button>
+        </Button>
 
         <div class="flex items-center gap-2">
-          <button
+          <Button
             type="button"
+            variant="outline"
+            size="sm"
             @click="emit('close')"
-            class="px-3.5 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-semibold transition-colors cursor-pointer"
           >
             Cancelar
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
+            size="sm"
             @click="handleSave"
             :disabled="loading"
-            class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent hover:bg-accent/90 text-bg font-bold text-xs shadow-md shadow-accent/20 transition-all cursor-pointer disabled:opacity-50"
+            class="bg-accent text-bg hover:bg-accent/90 font-bold shadow-md shadow-accent/20"
           >
-            <PhCircleNotch v-if="loading" :size="14" class="animate-spin" />
-            <PhFloppyDisk v-else :size="14" weight="bold" />
+            <PhCircleNotch v-if="loading" :size="14" class="animate-spin mr-1.5" />
+            <PhFloppyDisk v-else :size="14" weight="bold" class="mr-1.5" />
             <span>{{ loading ? 'Salvando...' : 'Salvar Alterações' }}</span>
-          </button>
+          </Button>
         </div>
       </div>
     </div>

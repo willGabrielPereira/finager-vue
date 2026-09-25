@@ -15,6 +15,7 @@ export const useTagsStore = defineStore('tags', {
     tags: [] as Tag[],
     frequentTags: [] as Tag[],
     loading: false,
+    loadError: false,
     loadingFrequent: false,
   }),
 
@@ -24,11 +25,13 @@ export const useTagsStore = defineStore('tags', {
       try {
         const { data } = await api.get('/tags');
         this.tags = data || [];
+        this.loadError = false;
         return this.tags;
       } catch (err: any) {
         if (err.response?.status !== 401 && err.response?.status !== 400) {
           console.warn('Falha ao buscar tags:', err?.message || err);
         }
+        this.loadError = true;
         this.tags = [];
         return [];
       } finally {

@@ -1,15 +1,20 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, markRaw } from 'vue'
+import { useEscapeKey } from '@/composables/useEscapeKey'
+import { positiveAmountSchema } from '@/validation/schemas'
+import { toast } from '@/utils/feedback'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import CurrencyInput from './CurrencyInput.vue'
-import CategorySelect from './CategorySelect.vue'
-import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
+import { TagCombobox } from './tag-combobox'
+import { Button } from './button'
+import { Input } from './input'
+import { DatePicker } from './date-picker'
+import { PhBank, PhCreditCard, PhX, PhPlus, PhCircleNotch, PhCheck, PhClock } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTagsStore } from '../../stores/tags'
 import { useTransactionsStore } from '../../stores/transactions'
-import { PhX, PhPlus, PhCircleNotch, PhCheck, PhClock } from '@phosphor-icons/vue'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
 }>()
 
@@ -29,9 +34,23 @@ const name = ref('')
 const memo = ref('')
 const accountId = ref('')
 const selectedTagId = ref('')
-const datePosted = ref(new Date().toISOString().split('T')[0])
+// Data local (toISOString usaria UTC e viraria "amanhã" após 21h no Brasil)
+const todayLocal = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+const datePosted = ref(todayLocal())
 const loading = ref(false)
 const errorMessage = ref('')
+
+const isDirty = computed(() => Boolean(amount.value || name.value.trim() || memo.value.trim()))
+
+// Clique no fundo só fecha se não houver nada digitado (evita perder o formulário)
+const onBackdropClick = () => {
+  if (!isDirty.value) emit('close')
+}
+
+useEscapeKey(() => props.isOpen, () => emit('close'))
 
 // Gesto de fechar no mobile (drag-to-dismiss)
 const translateY = ref(0)
@@ -71,7 +90,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     label: acc.name,
     sublabel: acc.institution,
     badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-    icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+    icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
   }))
 })
 
@@ -86,15 +105,15 @@ onMounted(() => {
 })
 
 const submit = async () => {
-  if (!amount.value || Number(amount.value) <= 0) {
-    errorMessage.value = 'Informe um valor válido.'
+  const amountCheck = positiveAmountSchema.safeParse(amount.value)
+  if (!amountCheck.success) {
+    errorMessage.value = amountCheck.error.issues[0].message
     return
   }
-  if (!accountId.value && accountsStore.accounts.length > 0) {
-    accountId.value = accountsStore.accounts[0].id
-  }
   if (!accountId.value) {
-    errorMessage.value = 'Cadastre ou selecione uma conta bancária antes de lançar.'
+    errorMessage.value = accountsStore.accounts.length
+      ? 'Selecione a conta do lançamento.'
+      : 'Cadastre uma conta bancária antes de lançar.'
     return
   }
 
@@ -102,7 +121,7 @@ const submit = async () => {
   errorMessage.value = ''
 
   try {
-    const finalAmount = type.value === 'DEBIT' ? -Math.abs(Number(amount.value)) : Math.abs(Number(amount.value))
+    const finalAmount = type.value === 'DEBIT' ? -Math.abs(amountCheck.data) : Math.abs(amountCheck.data)
 
     await txStore.createTransaction({
       account_id: accountId.value,
@@ -111,17 +130,23 @@ const submit = async () => {
       name: name.value.trim(),
       memo: memo.value.trim(),
       status: status.value,
-      date_posted: new Date(datePosted.value).toISOString(),
+      // Meio-dia UTC: mesma convenção do modal de edição, evita a data "voltar" um dia no fuso do Brasil
+      date_posted: new Date(datePosted.value + 'T12:00:00Z').toISOString(),
       tags: selectedTagId.value ? [selectedTagId.value] : [],
     })
 
+    toast.success('Lançamento criado', type.value === 'DEBIT' ? 'Despesa registrada.' : 'Receita registrada.')
     emit('created')
     emit('close')
-    // Reset form
+    // Reset form (conta volta vazia: escolha sempre explícita)
+    accountId.value = ''
     name.value = ''
     memo.value = ''
     amount.value = ''
+    type.value = 'DEBIT'
     status.value = 'POSTED'
+    selectedTagId.value = ''
+    datePosted.value = todayLocal()
   } catch (err: any) {
     console.error('Falha ao criar transação:', err)
     errorMessage.value = err.response?.data?.message || 'Falha ao salvar transação'
@@ -135,7 +160,7 @@ const submit = async () => {
   <div 
     v-if="isOpen"
     class="fixed inset-0 z-[10002] flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto overscroll-contain"
-    @click="emit('close')"
+    @click="onBackdropClick"
   >
     <div 
       class="bg-surface border border-white/10 rounded-t-3xl sm:rounded-2xl w-full max-w-lg max-h-[90dvh] flex flex-col shadow-2xl overflow-hidden animate-in slide-in-from-bottom sm:zoom-in-95 duration-200 text-white my-0 sm:my-auto overscroll-contain will-change-transform"
@@ -143,6 +168,9 @@ const submit = async () => {
         transform: translateY > 0 ? `translateY(${translateY}px)` : undefined,
         transition: isDragging ? 'none' : 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)'
       }"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-tx-title"
       @click.stop
     >
       <!-- Barra Mobile Drag indicator com suporte a toque -->
@@ -163,13 +191,14 @@ const submit = async () => {
         @touchend="onTouchEnd"
       >
         <div>
-          <h3 class="text-base sm:text-lg font-bold text-white">Novo Lançamento</h3>
+          <h3 id="create-tx-title" class="text-base sm:text-lg font-bold text-white">Novo Lançamento</h3>
           <p class="text-[11px] text-white/50">Crie uma despesa ou receita avulsa</p>
         </div>
         <button 
           @click="emit('close')" 
-          class="text-white/40 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+          class="text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
           title="Fechar"
+          aria-label="Fechar"
         >
           <PhX :size="18" />
         </button>
@@ -177,7 +206,7 @@ const submit = async () => {
 
       <!-- Corpo com Rolagem Interna -->
       <div class="px-5 py-4 overflow-y-auto flex-1 flex flex-col gap-3.5 custom-scrollbar">
-        <div v-if="errorMessage" class="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
+        <div v-if="errorMessage" role="alert" class="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs">
           {{ errorMessage }}
         </div>
 
@@ -203,8 +232,9 @@ const submit = async () => {
 
         <!-- Valor com Máscara Monetária -->
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-semibold text-white/70">Valor</label>
+          <label for="create-tx-amount" class="text-xs font-semibold text-white/70">Valor</label>
           <CurrencyInput
+            id="create-tx-amount"
             v-model="amount"
             placeholder="0,00"
           />
@@ -213,21 +243,21 @@ const submit = async () => {
         <!-- Nome e Observação -->
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-semibold text-white/70">Estabelecimento / Descrição</label>
-            <input
+            <label for="create-tx-name" class="text-xs font-semibold text-white/70">Descrição</label>
+            <Input
+              id="create-tx-name"
               v-model="name"
               type="text"
               placeholder="Ex: Supermercado Extra"
-              class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent"
             />
           </div>
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-semibold text-white/70">Observação (Opcional)</label>
-            <input
+            <label for="create-tx-memo" class="text-xs font-semibold text-white/70">Observação (opcional)</label>
+            <Input
+              id="create-tx-memo"
               v-model="memo"
               type="text"
               placeholder="Ex: Compras do mês"
-              class="bg-slate-950 border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent"
             />
           </div>
         </div>
@@ -235,7 +265,7 @@ const submit = async () => {
         <!-- Conta, Categoria e Data -->
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-semibold text-white/70">Conta Bancária</label>
+            <label class="text-xs font-semibold text-white/70">Conta <span class="text-rose-400" aria-hidden="true">*</span></label>
             <AppSelect
               v-model="accountId"
               :options="accountOptions"
@@ -246,26 +276,21 @@ const submit = async () => {
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Categoria</label>
-            <CategorySelect
+            <TagCombobox
               v-model="selectedTagId"
-              placeholder="Sem Categoria"
-              size="md"
+              placeholder="Sem categoria"
             />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-semibold text-white/70">Data</label>
-            <input
-              v-model="datePosted"
-              type="date"
-              class="bg-slate-950 border border-white/10 rounded-xl px-2.5 py-2 text-xs text-white focus:outline-none focus:border-accent cursor-pointer"
-            />
+            <DatePicker v-model="datePosted" />
           </div>
         </div>
 
         <!-- Situação: Já Pago vs Previsto (Pendente) -->
         <div class="flex flex-col gap-1.5 pt-1">
-          <label class="text-xs font-semibold text-white/70">Situação do Lançamento</label>
+          <label class="text-xs font-semibold text-white/70">Situação</label>
           <div class="grid grid-cols-2 gap-2 bg-white/5 p-1 rounded-xl">
             <button
               type="button"
@@ -274,7 +299,7 @@ const submit = async () => {
               :class="status === 'POSTED' ? 'bg-accent/20 border border-accent/40 text-accent font-bold shadow-sm' : 'text-white/50 hover:text-white border border-transparent'"
             >
               <PhCheck :size="14" weight="bold" />
-              <span>Já Pago (Efetivado)</span>
+              <span>Efetivada</span>
             </button>
             <button
               type="button"
@@ -283,34 +308,36 @@ const submit = async () => {
               :class="status === 'PLANNED' ? 'bg-amber-500/20 border border-amber-500/40 text-amber-400 font-bold shadow-sm' : 'text-white/50 hover:text-white border border-transparent'"
             >
               <PhClock :size="14" weight="bold" />
-              <span>Previsto (Pendente)</span>
+              <span>Prevista</span>
             </button>
           </div>
-          <p class="text-[10px] text-white/40 px-1">
-            {{ status === 'POSTED' ? 'O valor já foi debitado ou creditado da conta.' : 'Programado para o futuro. Não afeta o saldo atual até ser confirmado.' }}
+          <p class="text-[11px] text-white/50 px-1">
+            {{ status === 'POSTED' ? 'O valor já saiu ou entrou na conta.' : 'Programada para o futuro. Não afeta o saldo até ser efetivada.' }}
           </p>
         </div>
       </div>
 
       <!-- Rodapé Fixo com Ações -->
       <div class="px-5 py-3 border-t border-white/10 flex items-center justify-end gap-3 flex-shrink-0 bg-surface/90 backdrop-blur-sm">
-        <button
+        <Button
           type="button"
+          variant="outline"
+          size="sm"
           @click="emit('close')"
-          class="px-4 py-2 text-xs font-semibold text-white/50 hover:text-white transition-colors cursor-pointer"
         >
           Cancelar
-        </button>
-        <button
+        </Button>
+        <Button
           type="button"
+          size="sm"
           @click="submit"
           :disabled="loading"
-          class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-accent text-bg font-bold text-xs hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50 shadow-lg shadow-accent/15"
+          class="gap-2 font-bold shadow-lg shadow-accent/15"
         >
           <PhCircleNotch v-if="loading" :size="16" class="animate-spin" />
           <PhPlus v-else :size="16" weight="bold" />
           <span>{{ loading ? 'Salvando...' : 'Criar Lançamento' }}</span>
-        </button>
+        </Button>
       </div>
     </div>
   </div>

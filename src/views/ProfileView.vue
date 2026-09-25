@@ -1,33 +1,45 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showAlert, toast } from '../utils/feedback'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useBillingStore } from '../stores/billing'
+import { profileInfoSchema, changePasswordSchema, optionalEmailSchema } from '@/validation/schemas'
+import { useFormValidation } from '@/composables/useFormValidation'
 import { 
   PhUser, 
   PhHouse, 
   PhLock, 
   PhCheckCircle, 
   PhWarningCircle, 
-  PhSignOut,
-  PhFloppyDisk,
-  PhKey,
-  PhCopy,
-  PhCheck,
-  PhBank,
-  PhUsers,
-  PhUserPlus,
-  PhTrash,
-  PhArrowRight,
-  PhEnvelopeSimple,
-  PhCrown,
-  PhLightning,
-  PhRocketLaunch,
+  PhSignOut, 
+  PhFloppyDisk, 
+  PhKey, 
+  PhCopy, 
+  PhCheck, 
+  PhBank, 
+  PhUsers, 
+  PhUserPlus, 
+  PhTrash, 
+  PhArrowRight, 
+  PhEnvelopeSimple, 
+  PhCrown, 
+  PhLightning, 
+  PhRocketLaunch, 
   PhShieldCheck,
-  PhX
+  PhShareNetwork
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 
 const authStore = useAuthStore()
 const billingStore = useBillingStore()
@@ -81,26 +93,23 @@ onMounted(async () => {
   }
 })
 
+const profileForm = useFormValidation(profileInfoSchema)
+
 const handleSaveProfile = async () => {
   profileError.value = ''
   profileSuccess.value = false
 
-  if (!login.value.trim() || login.value.trim().length < 4) {
-    profileError.value = 'O nome de usuário deve conter no mínimo 4 caracteres.'
-    return
-  }
-
-  const trimmedEmail = email.value.trim().toLowerCase()
-  if (trimmedEmail && (!trimmedEmail.includes('@') || !trimmedEmail.includes('.'))) {
-    profileError.value = 'Por favor, informe um e-mail válido.'
+  const data = profileForm.validate({ login: login.value, email: email.value.toLowerCase() })
+  if (!data) {
+    profileError.value = profileForm.firstError.value
     return
   }
 
   profileLoading.value = true
   try {
     await authStore.updateProfile({
-      login: login.value.trim(),
-      email: trimmedEmail,
+      login: data.login,
+      email: data.email,
       family_name: familyName.value.trim(),
     })
     profileSuccess.value = true
@@ -114,26 +123,25 @@ const handleSaveProfile = async () => {
   }
 }
 
+const passwordForm = useFormValidation(changePasswordSchema)
+
 const handleChangePassword = async () => {
   passwordError.value = ''
   passwordSuccess.value = false
 
-  if (!currentPassword.value || !newPassword.value) {
-    passwordError.value = 'Preencha a senha atual e a nova senha.'
-    return
-  }
-  if (newPassword.value.length < 8) {
-    passwordError.value = 'A nova senha deve possuir pelo menos 8 caracteres.'
-    return
-  }
-  if (newPassword.value !== confirmPassword.value) {
-    passwordError.value = 'A confirmação não confere com a nova senha digitada.'
+  const data = passwordForm.validate({
+    currentPassword: currentPassword.value,
+    newPassword: newPassword.value,
+    confirmPassword: confirmPassword.value,
+  })
+  if (!data) {
+    passwordError.value = passwordForm.firstError.value
     return
   }
 
   passwordLoading.value = true
   try {
-    await authStore.changePassword(currentPassword.value, newPassword.value)
+    await authStore.changePassword(data.currentPassword, data.newPassword)
     passwordSuccess.value = true
     currentPassword.value = ''
     newPassword.value = ''
@@ -156,10 +164,16 @@ const openInviteModal = () => {
 }
 
 const handleCreateInvite = async () => {
-  inviteLoading.value = true
   inviteError.value = ''
+  const emailCheck = optionalEmailSchema.safeParse(inviteTargetEmail.value.trim())
+  if (!emailCheck.success) {
+    inviteError.value = emailCheck.error.issues[0].message
+    return
+  }
+
+  inviteLoading.value = true
   try {
-    const data = await authStore.createInvite(inviteTargetEmail.value.trim() || undefined)
+    const data = await authStore.createInvite(emailCheck.data || undefined)
     const origin = window.location.origin
     const inviteLink = `${origin}/register?invite=${data.token}`
     generatedInvite.value = {
@@ -174,13 +188,27 @@ const handleCreateInvite = async () => {
   }
 }
 
-const copyInviteLink = () => {
-  if (generatedInvite.value?.link) {
-    navigator.clipboard.writeText(generatedInvite.value.link)
+const copyInviteLink = async () => {
+  if (!generatedInvite.value?.link) return
+  try {
+    await navigator.clipboard.writeText(generatedInvite.value.link)
     copiedInvite.value = true
     setTimeout(() => {
       copiedInvite.value = false
     }, 2000)
+  } catch {
+    toast.error('Não foi possível copiar', 'Selecione o link e copie manualmente.')
+  }
+}
+
+// No celular, compartilhar direto no WhatsApp/e-mail é mais natural que copiar
+const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+const shareInviteLink = async () => {
+  if (!generatedInvite.value?.link) return
+  try {
+    await navigator.share({ title: 'Convite Finager', text: 'Entre na nossa família no Finager:', url: generatedInvite.value.link })
+  } catch {
+    // Usuário cancelou o compartilhamento
   }
 }
 
@@ -192,12 +220,21 @@ const handleJoinFamily = async () => {
     return
   }
 
+  const confirmed = await showAlert.confirm({
+    title: 'Entrar em outra família?',
+    text: `Você passará a ver as contas e lançamentos da nova família e deixará de ver os de "${authStore.user?.family_name || 'sua família atual'}".`,
+    confirmText: 'Entrar na nova família',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
+
   joinLoading.value = true
   try {
     const data = await authStore.joinFamily(joinToken.value.trim())
-    joinSuccess.value = data.message || 'Você ingressou na nova família com sucesso!'
-    joinToken.value = ''
-    familyName.value = authStore.user?.family_name || ''
+    toast.success('Você entrou na nova família', data.message)
+    // Recarrega o app inteiro: todas as stores ainda têm dados da família anterior
+    window.location.assign('/')
   } catch (err: any) {
     joinError.value = err.response?.data?.error || err.response?.data?.message || 'Código de convite inválido ou expirado.'
   } finally {
@@ -224,15 +261,6 @@ const handleRemoveMember = async (memberId: string, memberLogin: string) => {
 }
 
 const handleLogout = async () => {
-  const confirmed = await showAlert.confirm({
-    title: 'Deseja realmente sair?',
-    text: 'Você precisará fazer login novamente para acessar suas finanças.',
-    confirmText: 'Sair da conta',
-    cancelText: 'Permanecer',
-    isDestructive: false,
-  })
-  if (!confirmed) return
-
   await authStore.logout()
   router.push('/login')
 }
@@ -257,18 +285,19 @@ const formatDate = (dateStr?: string) => {
         </p>
       </div>
 
-      <button
-        type="button"
+      <Button
+        variant="destructive"
+        size="sm"
         @click="handleLogout"
-        class="flex items-center justify-center gap-2 py-2 px-3.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-semibold transition-all cursor-pointer"
+        class="gap-2 text-xs"
       >
         <PhSignOut :size="16" />
         <span>Sair da Conta</span>
-      </button>
+      </Button>
     </div>
 
     <!-- Banner do Usuário -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <Card class="p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-md">
       <div class="flex items-center gap-4">
         <div class="w-14 h-14 rounded-2xl bg-accent/20 border border-accent/30 text-accent flex items-center justify-center text-xl font-bold shadow-lg shadow-accent/10">
           {{ (authStore.user?.login || 'U').charAt(0).toUpperCase() }}
@@ -295,11 +324,11 @@ const formatDate = (dateStr?: string) => {
         <span>Gerenciar Contas Bancárias</span>
         <PhArrowRight :size="13" />
       </router-link>
-    </div>
+    </Card>
 
     
     <!-- Card Resumo do Plano & Quotas -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
+    <Card class="p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-5 relative overflow-hidden">
       <div class="flex items-start sm:items-center gap-4 z-10">
         <div 
           class="w-12 h-12 rounded-2xl border flex items-center justify-center shrink-0"
@@ -312,14 +341,15 @@ const formatDate = (dateStr?: string) => {
         <div>
           <div class="flex items-center gap-2">
             <span class="text-xs font-semibold text-white/50">Plano Atual</span>
-            <span 
-              class="text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider"
+            <Badge 
+              variant="outline"
+              class="text-[10px] font-bold uppercase tracking-wider"
               :class="billingStore.isPro 
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' 
                 : 'bg-white/10 text-white/80 border-white/15'"
             >
               {{ billingStore.isPro ? 'Plano Pro' : 'Plano Free' }}
-            </span>
+            </Badge>
           </div>
           <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1.5 text-xs text-white/70">
             <span>
@@ -348,30 +378,30 @@ const formatDate = (dateStr?: string) => {
         <span>{{ billingStore.isPro ? 'Gerenciar Plano' : 'Fazer Upgrade para Pro' }}</span>
         <PhArrowRight :size="13" />
       </router-link>
-    </div>
+    </Card>
 
     <!-- Seção Membros da Família & Convite Seguro -->
-    <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+    <Card class="p-6 shadow-md flex flex-col gap-4">
       <div class="flex items-center justify-between pb-2 border-b border-white/5">
         <div class="flex items-center gap-2">
           <PhUsers :size="20" class="text-accent" weight="duotone" />
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
             <span>Membros da Família Compartilhada</span>
-            <span class="text-xs text-white/40 font-normal">({{ billingStore.membersUsed }}/{{ billingStore.isMembersUnlimited ? '∞' : billingStore.membersLimit }})</span>
+            <span class="text-xs text-white/50 font-normal">({{ billingStore.membersUsed }}/{{ billingStore.isMembersUnlimited ? '∞' : billingStore.membersLimit }})</span>
           </h3>
         </div>
 
-        <button
-          type="button"
+        <Button
+          size="sm"
           @click="openInviteModal"
-          class="flex items-center gap-1.5 py-1.5 px-3 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-md shadow-accent/15"
+          class="gap-1.5 font-bold shadow-md shadow-accent/15"
         >
           <PhUserPlus :size="15" weight="bold" />
           <span>Convidar Membro</span>
-        </button>
+        </Button>
       </div>
 
-      <div v-if="authStore.familyMembers.length === 0" class="p-4 text-center text-xs text-white/40">
+      <div v-if="authStore.familyMembers.length === 0" class="p-4 text-center text-xs text-white/50">
         Nenhum membro listado.
       </div>
 
@@ -390,7 +420,7 @@ const formatDate = (dateStr?: string) => {
                 <span>{{ m.login }}</span>
                 <span v-if="m.user_id === authStore.user?.user_id" class="text-[10px] bg-accent/20 text-accent px-1.5 py-0.2 rounded font-normal">você</span>
               </p>
-              <p class="text-[11px] text-white/40 truncate max-w-[180px]">{{ m.email || 'Sem e-mail' }}</p>
+              <p class="text-[11px] text-white/50 truncate max-w-[180px]">{{ m.email || 'Sem e-mail' }}</p>
             </div>
           </div>
 
@@ -410,31 +440,32 @@ const formatDate = (dateStr?: string) => {
       <!-- Ingressar em Outra Família via Código -->
       <div class="mt-2 pt-4 border-t border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div class="flex-1">
-          <label class="text-xs text-white/70 block mb-1">Recebeu um convite? Cole o código ou abra o link:</label>
-          <input
+          <label for="profile-join-token" class="text-xs text-white/70 block mb-1">Recebeu um convite? Cole o código ou abra o link:</label>
+          <Input id="profile-join-token"
             v-model="joinToken"
             type="text"
             placeholder="Cole o código do convite aqui..."
-            class="w-full bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-1 focus:ring-accent"
+            class="text-xs"
           />
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           @click="handleJoinFamily"
           :disabled="joinLoading"
-          class="sm:mt-5 py-2 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+          class="sm:mt-5 font-semibold"
         >
           {{ joinLoading ? 'Entrando...' : 'Entrar na Família' }}
-        </button>
+        </Button>
       </div>
       <p v-if="joinSuccess" class="text-xs text-emerald-400 mt-1">{{ joinSuccess }}</p>
       <p v-if="joinError" class="text-xs text-rose-400 mt-1">{{ joinError }}</p>
-    </div>
+    </Card>
 
     <!-- Grid de Configurações -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
       <!-- Card 1: Dados Pessoais e Espaço Familiar -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+      <Card class="p-6 shadow-md flex flex-col gap-4">
         <div class="flex items-center gap-2 pb-2 border-b border-white/5">
           <PhUser :size="18" class="text-accent" weight="bold" />
           <h3 class="text-sm font-bold text-white">Dados de Identificação</h3>
@@ -442,31 +473,28 @@ const formatDate = (dateStr?: string) => {
 
         <form @submit.prevent="handleSaveProfile" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome de Usuário (Login)</label>
-            <input
+            <label for="profile-login" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome de Usuário (Login)</label>
+            <Input id="profile-login"
               v-model="login"
               type="text"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">E-mail Cadastrado</label>
-            <input
+            <label for="profile-email" class="text-xs font-semibold text-white/80 mb-1.5 block">E-mail Cadastrado</label>
+            <Input id="profile-email"
               v-model="email"
               type="email"
               placeholder="ex: usuario@email.com"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da Família / Espaço</label>
-            <input
+            <label for="profile-family" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da Família / Espaço</label>
+            <Input id="profile-family"
               v-model="familyName"
               type="text"
               placeholder="ex: Família Pereira"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
@@ -480,19 +508,20 @@ const formatDate = (dateStr?: string) => {
             <span>{{ profileError }}</span>
           </div>
 
-          <button
+          <Button
             type="submit"
+            size="sm"
             :disabled="profileLoading"
-            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/15 disabled:opacity-50 mt-1"
+            class="gap-2 font-bold shadow-lg shadow-accent/15 mt-1"
           >
             <PhFloppyDisk :size="16" weight="bold" />
             <span>{{ profileLoading ? 'Salvando...' : 'Salvar Alterações' }}</span>
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
 
       <!-- Card 2: Segurança e Senha -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-md flex flex-col gap-4">
+      <Card class="p-6 shadow-md flex flex-col gap-4">
         <div class="flex items-center gap-2 pb-2 border-b border-white/5">
           <PhLock :size="18" class="text-accent" weight="bold" />
           <h3 class="text-sm font-bold text-white">Alterar Senha</h3>
@@ -500,32 +529,29 @@ const formatDate = (dateStr?: string) => {
 
         <form @submit.prevent="handleChangePassword" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual</label>
-            <input
+            <label for="profile-current-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual</label>
+            <Input id="profile-current-password"
               v-model="currentPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nova Senha (mínimo 8 caracteres)</label>
-            <input
+            <label for="profile-new-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Nova Senha (mínimo 8 caracteres)</label>
+            <Input id="profile-new-password"
               v-model="newPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Confirmar Nova Senha</label>
-            <input
+            <label for="profile-confirm-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Confirmar Nova Senha</label>
+            <Input id="profile-confirm-password"
               v-model="confirmPassword"
               type="password"
               placeholder="••••••••"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
           </div>
 
@@ -539,20 +565,22 @@ const formatDate = (dateStr?: string) => {
             <span>{{ passwordError }}</span>
           </div>
 
-          <button
+          <Button
             type="submit"
+            variant="secondary"
+            size="sm"
             :disabled="passwordLoading"
-            class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-bold transition-all cursor-pointer disabled:opacity-50 mt-1"
+            class="gap-2 font-bold mt-1"
           >
             <PhKey :size="16" />
             <span>{{ passwordLoading ? 'Alterando...' : 'Atualizar Senha' }}</span>
-          </button>
+          </Button>
         </form>
-      </div>
+      </Card>
     </div>
 
-        <!-- Zona de Privacidade e Direitos LGPD -->
-    <div class="bg-surface rounded-2xl p-6 border border-red-500/20 shadow-xl flex flex-col gap-4">
+    <!-- Zona de Privacidade e Direitos LGPD -->
+    <Card class="p-6 border-red-500/20 shadow-xl flex flex-col gap-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h3 class="text-sm font-bold text-red-400 flex items-center gap-2">
@@ -563,34 +591,26 @@ const formatDate = (dateStr?: string) => {
             Em conformidade com a Lei Geral de Proteção de Dados, você tem o direito de excluir permanentemente seus acessos, contas bancárias, extratos e histórico financeiro.
           </p>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="destructive"
+          size="sm"
           @click="openDeleteAccountModal"
-          class="shrink-0 px-4 py-2.5 rounded-xl bg-red-500/15 hover:bg-red-500/25 border border-red-500/30 text-red-300 hover:text-red-200 text-xs font-bold transition-all cursor-pointer">
+          class="shrink-0"
+        >
           <span>Excluir Minha Conta</span>
-        </button>
+        </Button>
       </div>
-    </div>
+    </Card>
 
     <!-- Modal de Convite Seguro -->
-    <div
-      v-if="isInviteModalOpen"
-      class="fixed inset-0 z-[10000] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      @click="isInviteModalOpen = false"
-    >
-      <div 
-        class="w-full max-w-md bg-surface border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150"
-        @click.stop
-      >
-        <div class="flex items-center justify-between pb-3 border-b border-white/10">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+    <Dialog v-model:open="isInviteModalOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2 text-sm font-bold text-white">
             <PhShieldCheck :size="18" class="text-accent" weight="duotone" />
             <span>Convidar Membro para a Família</span>
-          </h3>
-          <button @click="isInviteModalOpen = false" class="text-white/40 hover:text-white transition-colors cursor-pointer">
-            <PhX :size="18" />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         <div v-if="!generatedInvite" class="flex flex-col gap-4">
           <p class="text-xs text-white/60 leading-relaxed">
@@ -598,17 +618,16 @@ const formatDate = (dateStr?: string) => {
           </p>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+            <label for="invite-email" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
               <PhEnvelopeSimple :size="14" class="text-accent" />
               <span>E-mail do Convidado (Recomendado para Segurança)</span>
             </label>
-            <input
+            <Input id="invite-email"
               v-model="inviteTargetEmail"
               type="email"
               placeholder="ex: parceiro@email.com (opcional)"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
             />
-            <p class="text-[11px] text-white/40 mt-1">
+            <p class="text-[11px] text-white/50 mt-1">
               Se informado, apenas uma conta com este e-mail poderá aceitar o convite, impedindo qualquer entrada indevida.
             </p>
           </div>
@@ -619,22 +638,24 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="isInviteModalOpen = false"
-              class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-medium cursor-pointer"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
+              size="sm"
               @click="handleCreateInvite"
               :disabled="inviteLoading"
-              class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 cursor-pointer disabled:opacity-50 shadow-lg shadow-accent/20"
+              class="gap-1.5 font-bold shadow-lg shadow-accent/20"
             >
               <PhShieldCheck :size="15" weight="bold" />
-              <span>{{ inviteLoading ? 'Gerando Link...' : 'Gerar Convite Criptografado' }}</span>
-            </button>
+              <span>{{ inviteLoading ? 'Gerando link...' : 'Gerar link de convite' }}</span>
+            </Button>
           </div>
         </div>
 
@@ -645,22 +666,35 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Link de Cadastro Direto:</label>
-            <div class="flex items-center gap-2">
-              <input
+            <label for="invite-link" class="text-xs font-semibold text-white/80 mb-1.5 block">Link de convite</label>
+            <div class="flex flex-wrap items-center gap-2">
+              <Input
+                id="invite-link"
                 :value="generatedInvite.link"
                 readonly
-                class="flex-1 bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white/80 font-mono truncate"
+                class="flex-1 min-w-0 font-mono text-xs truncate"
               />
-              <button
+              <Button
+                v-if="canShare"
                 type="button"
+                size="sm"
+                variant="outline"
+                @click="shareInviteLink"
+                class="gap-1.5"
+              >
+                <PhShareNetwork :size="14" weight="bold" />
+                <span>Compartilhar</span>
+              </Button>
+              <Button
+                type="button"
+                size="sm"
                 @click="copyInviteLink"
-                class="px-3.5 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 flex items-center gap-1.5 cursor-pointer shadow-md shadow-accent/15"
+                class="gap-1.5 font-bold shadow-md shadow-accent/15"
               >
                 <PhCheck v-if="copiedInvite" :size="14" weight="bold" />
                 <PhCopy v-else :size="14" weight="bold" />
                 <span>{{ copiedInvite ? 'Copiado!' : 'Copiar' }}</span>
-              </button>
+              </Button>
             </div>
           </div>
 
@@ -670,17 +704,19 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div class="flex justify-end pt-1">
-            <button
+            <Button
               type="button"
+              variant="secondary"
+              size="sm"
               @click="isInviteModalOpen = false"
-              class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold cursor-pointer"
             >
               Concluir
-            </button>
+            </Button>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
+
     <DeleteAccountModal :is-open="isDeleteModalOpen" @close="isDeleteModalOpen = false" />
   </div>
 </template>

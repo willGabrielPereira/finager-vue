@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { useAuthStore } from '../../stores/auth'
 import { useAccountsStore } from '../../stores/accounts'
 import { useTransactionsStore } from '../../stores/transactions'
+import { api } from '../../api/axios'
 import { 
   PhCheckCircle, 
   PhCircle, 
@@ -30,7 +31,26 @@ const txStore = useTransactionsStore()
 
 const isDismissed = ref(localStorage.getItem('finager_onboarding_dismissed') === 'true')
 
+// Totais globais vindos do backend. O Dashboard não carrega txStore.transactions,
+// então sem isso o checklist achava que nada foi importado/categorizado.
+const totalTx = ref(0)
+const untaggedTx = ref(0)
+
+const fetchProgress = async () => {
+  try {
+    const [all, untagged] = await Promise.all([
+      api.get('/transactions', { params: { limit: 1 } }),
+      api.get('/transactions', { params: { limit: 1, status: 'UNTAGGED' } }),
+    ])
+    totalTx.value = all.data.total || 0
+    untaggedTx.value = untagged.data.total || 0
+  } catch {
+    // Sem progresso remoto: cai no estado local da store
+  }
+}
+
 onMounted(async () => {
+  if (!isDismissed.value) fetchProgress()
   if (accountsStore.accounts.length === 0) {
     accountsStore.fetchAccounts()
   }
@@ -40,9 +60,9 @@ onMounted(async () => {
 })
 
 const hasAccount = computed(() => accountsStore.accounts.length > 0)
-const hasImported = computed(() => txStore.transactions.length > 0 || txStore.pagination.total > 0)
+const hasImported = computed(() => totalTx.value > 0 || txStore.transactions.length > 0 || txStore.pagination.total > 0)
 const hasReviewedTags = computed(() => {
-  return txStore.transactions.some(t => t.tags && t.tags.length > 0)
+  return totalTx.value > untaggedTx.value || txStore.transactions.some(t => t.tags && t.tags.length > 0)
 })
 const hasFamily = computed(() => authStore.familyMembers.length > 1)
 
@@ -79,7 +99,7 @@ defineExpose({
 <template>
   <div 
     v-if="!isDismissed && !isAllCompleted"
-    class="bg-gradient-to-r from-surface via-surface to-accent/5 border border-white/10 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xl mb-6 flex flex-col gap-4 relative overflow-hidden"
+    class="bg-gradient-to-r from-surface via-surface to-accent/5 border border-white/10 rounded-2xl sm:rounded-3xl p-5 sm:p-6 shadow-xl flex flex-col gap-4 relative overflow-hidden"
   >
     <!-- Background Decorator -->
     <div class="absolute -right-10 -bottom-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl pointer-events-none"></div>
@@ -113,8 +133,9 @@ defineExpose({
 
         <button 
           @click="handleDismiss"
-          class="text-white/40 hover:text-white p-1.5 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+          class="text-white/50 hover:text-white p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
           title="Ocultar checklist"
+          aria-label="Ocultar checklist"
         >
           <PhX :size="18" />
         </button>
@@ -141,12 +162,12 @@ defineExpose({
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-2">
             <PhCheckCircle v-if="hasAccount" :size="18" weight="fill" class="text-accent shrink-0" />
-            <PhCircle v-else :size="18" class="text-white/30 shrink-0" />
+            <PhCircle v-else :size="18" class="text-white/50 shrink-0" />
             <span class="text-xs font-bold" :class="hasAccount ? 'line-through text-white/50' : 'text-white'">
               1. Cadastrar Conta
             </span>
           </div>
-          <PhBank :size="16" class="text-white/30" />
+          <PhBank :size="16" class="text-white/50" />
         </div>
 
         <button
@@ -171,12 +192,12 @@ defineExpose({
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-2">
             <PhCheckCircle v-if="hasImported" :size="18" weight="fill" class="text-accent shrink-0" />
-            <PhCircle v-else :size="18" class="text-white/30 shrink-0" />
+            <PhCircle v-else :size="18" class="text-white/50 shrink-0" />
             <span class="text-xs font-bold" :class="hasImported ? 'line-through text-white/50' : 'text-white'">
               2. Importar 1º OFX
             </span>
           </div>
-          <PhUploadSimple :size="16" class="text-white/30" />
+          <PhUploadSimple :size="16" class="text-white/50" />
         </div>
 
         <button
@@ -201,12 +222,12 @@ defineExpose({
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-2">
             <PhCheckCircle v-if="hasReviewedTags" :size="18" weight="fill" class="text-accent shrink-0" />
-            <PhCircle v-else :size="18" class="text-white/30 shrink-0" />
+            <PhCircle v-else :size="18" class="text-white/50 shrink-0" />
             <span class="text-xs font-bold" :class="hasReviewedTags ? 'line-through text-white/50' : 'text-white'">
               3. Conferir Gastos
             </span>
           </div>
-          <PhListDashes :size="16" class="text-white/30" />
+          <PhListDashes :size="16" class="text-white/50" />
         </div>
 
         <button
@@ -228,12 +249,12 @@ defineExpose({
         <div class="flex items-start justify-between gap-2">
           <div class="flex items-center gap-2">
             <PhCheckCircle v-if="hasFamily" :size="18" weight="fill" class="text-accent shrink-0" />
-            <PhCircle v-else :size="18" class="text-white/30 shrink-0" />
+            <PhCircle v-else :size="18" class="text-white/50 shrink-0" />
             <span class="text-xs font-bold" :class="hasFamily ? 'line-through text-white/50' : 'text-white'">
-              4. Família <span class="text-[10px] text-white/40 font-normal">(Opcional)</span>
+              4. Família <span class="text-[10px] text-white/50 font-normal">(Opcional)</span>
             </span>
           </div>
-          <PhUsers :size="16" class="text-white/30" />
+          <PhUsers :size="16" class="text-white/50" />
         </div>
 
         <button

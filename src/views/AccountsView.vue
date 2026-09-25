@@ -1,10 +1,11 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed, onMounted, inject } from 'vue'
 import { useAccountsStore, type Account } from '../stores/accounts'
 import { useAuthStore } from '../stores/auth'
 import { useBillingStore } from '../stores/billing'
 import { useRouter } from 'vue-router'
 import { showAlert, toast } from '../utils/feedback'
+import { minLengthText } from '@/validation/schemas'
 import { 
   PhBank, 
   PhPlus, 
@@ -15,8 +16,7 @@ import {
   PhUsers, 
   PhCoins, 
   PhChartLineUp, 
-  PhCheck, 
-  PhX, 
+  PhCheck,
   PhWarningCircle,
   PhFileText,
   PhCrown,
@@ -24,12 +24,22 @@ import {
   PhRocketLaunch,
   PhArrowRight
 } from '@phosphor-icons/vue'
+import { Button } from '@/components/ui/button'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle
+} from '@/components/ui/dialog'
 
+const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
 const accountsStore = useAccountsStore()
 const authStore = useAuthStore()
 const billingStore = useBillingStore()
 const router = useRouter()
-const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
 
 const isModalOpen = ref(false)
 const isEditing = ref(false)
@@ -117,10 +127,12 @@ const closeModal = () => {
 
 const handleSave = async () => {
   formError.value = ''
-  if (!form.value.name.trim() || form.value.name.trim().length < 2) {
-    formError.value = 'O nome da conta deve conter pelo menos 2 caracteres.'
+  const nameCheck = minLengthText(2, 'O nome da conta deve conter pelo menos 2 caracteres.').safeParse(form.value.name)
+  if (!nameCheck.success) {
+    formError.value = nameCheck.error.issues[0].message
     return
   }
+  form.value.name = nameCheck.data
 
   submitting.value = true
   try {
@@ -136,8 +148,10 @@ const handleSave = async () => {
 
     if (isEditing.value && editingId.value) {
       await accountsStore.updateAccount(editingId.value, payload)
+      toast.success('Conta atualizada.')
     } else {
       await accountsStore.createAccount(payload)
+      toast.success('Conta criada.', 'Agora você já pode importar o extrato OFX dela.')
     }
 
     closeModal()
@@ -151,9 +165,11 @@ const handleSave = async () => {
 
 const handleDelete = async (acc: Account) => {
   const confirmed = await showAlert.confirm({
-    title: `Excluir a conta "${acc.name}"?`,
-    text: 'Todas as transações vinculadas a ela poderão ser afetadas.',
-    confirmText: 'Sim, excluir',
+    // Nome digitado pelo usuário: o SweetAlert2 renderiza `title` como HTML (não escapa),
+    // então nunca interpole dado de usuário ali — só em `text`, que vai como texto puro.
+    title: 'Excluir conta bancária?',
+    text: `A conta "${acc.name}" e todas as suas transações serão excluídas permanentemente. Esta ação não pode ser desfeita.`,
+    confirmText: 'Excluir conta e transações',
     cancelText: 'Cancelar',
     isDestructive: true,
   })
@@ -201,14 +217,14 @@ const getTypeBadgeClass = (type?: string) => {
         </p>
       </div>
 
-      <button
-        type="button"
+      <Button
+        size="sm"
         @click="openCreateModal"
-        class="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer shadow-lg shadow-accent/20"
+        class="gap-2 font-bold shadow-lg shadow-accent/20"
       >
         <PhPlus :size="16" weight="bold" />
         <span>Nova Conta</span>
-      </button>
+      </Button>
     </div>
 
     
@@ -273,8 +289,8 @@ const getTypeBadgeClass = (type?: string) => {
     </div>
 
     <!-- Cards Resumo -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
-      <div class="p-4 rounded-2xl bg-surface border border-white/5 flex items-center gap-3.5 shadow-sm">
+    <div class="hidden sm:grid grid-cols-3 gap-3">
+      <Card class="p-4 flex items-center gap-3.5 shadow-sm">
         <div class="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center">
           <PhBank :size="22" weight="duotone" />
         </div>
@@ -282,9 +298,9 @@ const getTypeBadgeClass = (type?: string) => {
           <span class="text-[11px] text-white/50 font-medium">Total de Contas</span>
           <p class="text-lg font-bold text-white">{{ accountsStore.accounts.length }}</p>
         </div>
-      </div>
+      </Card>
 
-      <div class="p-4 rounded-2xl bg-surface border border-white/5 flex items-center gap-3.5 shadow-sm">
+      <Card class="p-4 flex items-center gap-3.5 shadow-sm">
         <div class="w-10 h-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center">
           <PhUsers :size="22" weight="duotone" />
         </div>
@@ -292,9 +308,9 @@ const getTypeBadgeClass = (type?: string) => {
           <span class="text-[11px] text-white/50 font-medium">Contas Conjuntas (Família)</span>
           <p class="text-lg font-bold text-emerald-400">{{ sharedAccountsCount }}</p>
         </div>
-      </div>
+      </Card>
 
-      <div class="p-4 rounded-2xl bg-surface border border-white/5 flex items-center gap-3.5 shadow-sm">
+      <Card class="p-4 flex items-center gap-3.5 shadow-sm">
         <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center">
           <PhLock :size="22" weight="duotone" />
         </div>
@@ -302,37 +318,37 @@ const getTypeBadgeClass = (type?: string) => {
           <span class="text-[11px] text-white/50 font-medium">Contas Privadas</span>
           <p class="text-lg font-bold text-amber-400">{{ privateAccountsCount }}</p>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Lista de Contas -->
-    <div v-if="accountsStore.loading" class="p-12 text-center text-white/40 text-sm">
+    <div v-if="accountsStore.loading" class="p-12 text-center text-white/50 text-sm">
       Carregando contas...
     </div>
 
-    <div v-else-if="accountsStore.accounts.length === 0" class="bg-surface rounded-2xl p-8 border border-white/5 text-center flex flex-col items-center justify-center gap-3">
-      <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white/40 flex items-center justify-center">
+    <Card v-else-if="accountsStore.accounts.length === 0" class="p-8 text-center flex flex-col items-center justify-center gap-3">
+      <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white/50 flex items-center justify-center">
         <PhBank :size="28" weight="duotone" />
       </div>
       <h3 class="text-base font-bold text-white">Nenhuma conta cadastrada</h3>
       <p class="text-xs text-white/50 max-w-sm">
         Cadastre sua primeira conta corrente ou cartão de crédito para começar a importar extratos e lançar transações.
       </p>
-      <button
-        type="button"
+      <Button
+        size="sm"
         @click="openCreateModal"
-        class="mt-2 flex items-center gap-2 py-2 px-4 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-all cursor-pointer"
+        class="mt-2 gap-2 font-bold"
       >
         <PhPlus :size="15" weight="bold" />
         <span>Cadastrar Primeira Conta</span>
-      </button>
-    </div>
+      </Button>
+    </Card>
 
     <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
-      <div
+      <Card
         v-for="acc in accountsStore.accounts"
         :key="acc.id"
-        class="bg-surface rounded-2xl p-5 border border-white/5 hover:border-white/15 transition-all shadow-sm flex flex-col justify-between gap-4 group"
+        class="p-5 hover:border-white/15 transition-all shadow-sm flex flex-col justify-between gap-4 group"
       >
         <div class="flex items-start justify-between gap-3">
           <div class="flex items-center gap-3">
@@ -352,16 +368,18 @@ const getTypeBadgeClass = (type?: string) => {
             <button
               type="button"
               @click="openEditModal(acc)"
-              class="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-              title="Editar Conta"
+              class="p-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Editar conta"
+              aria-label="Editar conta"
             >
               <PhPencilSimple :size="16" />
             </button>
             <button
               type="button"
               @click="handleDelete(acc)"
-              class="p-1.5 rounded-lg text-rose-400/60 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
-              title="Excluir Conta"
+              class="p-2.5 rounded-lg text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
+              title="Excluir conta"
+              aria-label="Excluir conta"
             >
               <PhTrash :size="16" />
             </button>
@@ -369,65 +387,57 @@ const getTypeBadgeClass = (type?: string) => {
         </div>
 
         <div class="flex items-center justify-between gap-2 pt-3 border-t border-white/5 text-[11px]">
-          <span class="px-2.5 py-1 rounded-lg border font-medium" :class="getTypeBadgeClass(acc.type)">
+          <Badge variant="outline" class="font-medium" :class="getTypeBadgeClass(acc.type)">
             {{ getTypeLabel(acc.type) }}
-          </span>
+          </Badge>
 
-          <span 
+          <Badge 
             v-if="acc.allowed_users && acc.allowed_users.length > 0"
-            class="flex items-center gap-1 text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md border border-amber-500/20 font-medium"
+            variant="outline"
+            class="flex items-center gap-1 text-amber-400 bg-amber-500/10 border-amber-500/20 font-medium"
             title="Apenas você tem acesso a esta conta"
           >
             <PhLock :size="12" />
             <span>Privada</span>
-          </span>
-          <span 
+          </Badge>
+          <Badge 
             v-else 
-            class="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md border border-emerald-500/20 font-medium"
+            variant="outline"
+            class="flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border-emerald-500/20 font-medium"
             title="Toda a família pode ver e lançar nesta conta"
           >
             <PhUsers :size="12" />
             <span>Conjunta</span>
-          </span>
+          </Badge>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Modal de Criação / Edição -->
-    <div
-      v-if="isModalOpen"
-      class="fixed inset-0 z-[10000] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-      @click="closeModal"
-    >
-      <div 
-        class="w-full max-w-md bg-surface border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-150"
-        @click.stop
-      >
-        <div class="flex items-center justify-between pb-3 border-b border-white/10">
-          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+    <Dialog v-model:open="isModalOpen">
+      <DialogContent class="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle class="flex items-center gap-2 text-sm font-bold text-white">
             <PhBank :size="18" class="text-accent" />
             <span>{{ isEditing ? 'Editar Conta Bancária' : 'Nova Conta Bancária' }}</span>
-          </h3>
-          <button @click="closeModal" class="text-white/40 hover:text-white transition-colors cursor-pointer">
-            <PhX :size="18" />
-          </button>
-        </div>
+          </DialogTitle>
+        </DialogHeader>
 
         <form @submit.prevent="handleSave" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome Identificador da Conta</label>
-            <input
+            <label for="account-form-name" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da conta</label>
+            <Input
+              id="account-form-name"
               v-model="form.name"
               type="text"
               placeholder="ex: Nubank Principal, Itaú Salário, Cartão XP"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
               required
             />
           </div>
 
           <!-- Instituição -->
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Instituição Financeira</label>
+            <label for="account-form-institution" class="text-xs font-semibold text-white/80 mb-1.5 block">Instituição financeira</label>
             <div class="grid grid-cols-3 gap-2 mb-2">
               <button
                 v-for="b in popularBanks.slice(0, 6)"
@@ -442,11 +452,11 @@ const getTypeBadgeClass = (type?: string) => {
                 {{ b.name }}
               </button>
             </div>
-            <input
+            <Input
+              id="account-form-institution"
               v-model="form.institution"
               type="text"
               placeholder="Ou digite o nome do banco/corretora"
-              class="w-full bg-bg border border-white/10 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-accent/50 focus:border-accent transition-all"
               required
             />
             <!-- Dica Contextual Guia OFX -->
@@ -524,7 +534,7 @@ const getTypeBadgeClass = (type?: string) => {
               />
               <span>Tornar esta conta privada (apenas eu posso visualizar e lançar nela)</span>
             </label>
-            <p class="text-[11px] text-white/40">
+            <p class="text-[11px] text-white/50">
               Contas conjuntas ficam visíveis para todos os membros que você convidar para a família.
             </p>
           </div>
@@ -535,24 +545,26 @@ const getTypeBadgeClass = (type?: string) => {
           </div>
 
           <div class="flex items-center justify-end gap-2 pt-2">
-            <button
+            <Button
               type="button"
+              variant="outline"
+              size="sm"
               @click="closeModal"
-              class="px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 text-xs font-medium transition-colors cursor-pointer"
             >
               Cancelar
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
+              size="sm"
               :disabled="submitting"
-              class="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-accent text-bg text-xs font-bold hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
+              class="gap-1.5 font-bold"
             >
               <PhCheck :size="14" weight="bold" />
               <span>{{ submitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Criar Conta') }}</span>
-            </button>
+            </Button>
           </div>
         </form>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   </div>
 </template>

@@ -4,10 +4,6 @@ import { useAuthStore } from '../../stores/auth'
 import { PhSignOut, PhUserCircle, PhWallet, PhCrown, PhLightning } from '@phosphor-icons/vue'
 import { useRouter } from 'vue-router'
 
-defineEmits<{
-  (e: 'import-ofx'): void
-}>()
-
 const authStore = useAuthStore()
 const router = useRouter()
 
@@ -65,15 +61,17 @@ const handleLogout = async () => {
         to="/profile"
         class="flex items-center gap-2 text-xs text-white/80 bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/5 transition-all cursor-pointer group"
         title="Ver meu perfil"
+        aria-label="Ver meu perfil"
       >
         <PhUserCircle :size="18" weight="duotone" class="text-accent group-hover:scale-105 transition-transform" />
-        <span class="font-medium max-w-[120px] truncate">{{ authStore.user?.login || 'Usuário' }}</span>
+        <span class="hidden sm:inline font-medium max-w-[120px] truncate">{{ authStore.user?.login || 'Usuário' }}</span>
       </router-link>
 
       <button 
         @click="handleLogout" 
-        class="p-2 rounded-xl text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-all cursor-pointer" 
+        class="p-2 rounded-xl text-white/50 hover:text-red-400 hover:bg-red-400/10 transition-all cursor-pointer" 
         title="Sair da conta"
+        aria-label="Sair da conta"
       >
         <PhSignOut :size="18" />
       </button>

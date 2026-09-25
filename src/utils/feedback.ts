@@ -17,6 +17,15 @@
 
 import Swal from 'sweetalert2';
 
+// SweetAlert2 renderiza `title` como HTML, não como texto (usa innerHTML internamente).
+// `text` já é seguro (vira textContent). Se algum chamador algum dia interpolar nome de
+// conta/categoria/usuário no título, isso vira XSS armazenado — como já aconteceu aqui
+// (nome de conta/categoria digitado pelo usuário indo direto pro `title` do confirm de
+// exclusão). Escapamos nesta única porta de entrada para que nenhum chamador precise
+// lembrar disso.
+const escapeHtml = (str: string): string =>
+  str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' } as Record<string, string>)[c]);
+
 // Instância base de Toast configurada para Dark OLED Finager
 const ToastInstance = Swal.mixin({
   toast: true,
@@ -40,28 +49,28 @@ export const toast = {
   success(title: string, text?: string) {
     return ToastInstance.fire({
       icon: 'success',
-      title,
+      title: escapeHtml(title),
       text,
     });
   },
   error(title: string, text?: string) {
     return ToastInstance.fire({
       icon: 'error',
-      title,
+      title: escapeHtml(title),
       text,
     });
   },
   info(title: string, text?: string) {
     return ToastInstance.fire({
       icon: 'info',
-      title,
+      title: escapeHtml(title),
       text,
     });
   },
   warning(title: string, text?: string) {
     return ToastInstance.fire({
       icon: 'warning',
-      title,
+      title: escapeHtml(title),
       text,
     });
   },
@@ -71,7 +80,7 @@ export const showAlert = {
   success(title: string, text?: string) {
     return Swal.fire({
       icon: 'success',
-      title,
+      title: escapeHtml(title),
       text,
       background: '#0f172a',
       color: '#ffffff',
@@ -86,7 +95,7 @@ export const showAlert = {
   error(title: string, text?: string) {
     return Swal.fire({
       icon: 'error',
-      title,
+      title: escapeHtml(title),
       text,
       background: '#0f172a',
       color: '#ffffff',
@@ -107,7 +116,7 @@ export const showAlert = {
   }): Promise<boolean> {
     const res = await Swal.fire({
       icon: options.isDestructive ? 'warning' : 'question',
-      title: options.title,
+      title: escapeHtml(options.title),
       text: options.text,
       showCancelButton: true,
       confirmButtonText: options.confirmText || (options.isDestructive ? 'Sim, excluir' : 'Confirmar'),

@@ -1,5 +1,5 @@
-﻿<script setup lang="ts">
-import { ref, computed, onMounted, watch } from 'vue'
+<script setup lang="ts">
+import { ref, computed, onMounted, watch, markRaw } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
@@ -7,10 +7,13 @@ import { inject } from 'vue'
 import { useRouter } from 'vue-router'
 import AppSelect, { type AppSelectOption } from '../components/ui/AppSelect.vue'
 import OnboardingChecklist from '../components/ui/OnboardingChecklist.vue'
+import { Card } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 
 const router = useRouter()
 const openOFXGuide = inject<(bankName?: string) => void>('openOFXGuide')
 const openImport = inject<() => void>('openImport')
+const openCreateTx = inject<() => void>('openCreateTx')
 import { 
   PhWallet, 
   PhTrendUp, 
@@ -23,7 +26,9 @@ import {
   PhArrowUpRight, 
   PhArrowDownRight,
   PhCreditCard,
-  PhBank
+  PhBank,
+  PhWarningCircle,
+  PhPlus
 } from '@phosphor-icons/vue'
 import { Doughnut } from 'vue-chartjs'
 import {
@@ -72,7 +77,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
     {
       value: '',
       label: 'Consolidado (Todas as Contas)',
-      icon: PhWallet
+      icon: markRaw(PhWallet)
     }
   ]
   accountsStore.accounts.forEach(acc => {
@@ -81,7 +86,7 @@ const accountOptions = computed<AppSelectOption[]>(() => {
       label: acc.name,
       sublabel: acc.institution,
       badge: acc.type === 'CREDIT_CARD' ? 'Cartão' : 'Conta',
-      icon: acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank
+      icon: markRaw(acc.type === 'CREDIT_CARD' ? PhCreditCard : PhBank)
     })
   })
   return list
@@ -349,7 +354,7 @@ const formatDate = (dateString: string) => {
 
       <div class="flex flex-col md:flex-row items-stretch md:items-center gap-2.5 w-full md:w-auto">
         <!-- 1. Seletor de Conta com Componente Padronizado -->
-        <div class="w-full md:w-60 lg:w-64 shrink-0">
+        <div class="w-full md:w-60 lg:w-64 shrink-0 order-2 md:order-none">
           <AppSelect
             v-model="selectedAccountId"
             :options="accountOptions"
@@ -358,33 +363,35 @@ const formatDate = (dateString: string) => {
           />
         </div>
 
-        <!-- 2. Navegador de Mês / Anão -->
-        <div class="flex items-center justify-between md:justify-center bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 w-full md:w-auto">
+        <!-- 2. Navegador de Mês / Ano -->
+        <div class="flex items-center justify-between md:justify-center bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-11 md:h-10 w-full md:w-auto order-1 md:order-none">
           <button
             type="button"
             @click="prevMonth"
-            class="p-2 sm:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            class="p-2.5 md:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
             title="Mês Anterior"
+            aria-label="Mês anterior"
           >
             <PhCaretLeft :size="15" weight="bold" />
           </button>
 
-          <span class="px-2 text-xs font-bold text-white text-center select-none truncate flex-1 md:flex-none md:min-w-[145px]">
+          <span class="px-2 text-sm md:text-xs font-bold text-white text-center select-none truncate flex-1 md:flex-none md:min-w-[145px]" aria-live="polite">
             {{ monthDisplay }}
           </span>
 
           <button
             type="button"
             @click="nextMonth"
-            class="p-2 sm:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            class="p-2.5 md:p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
             title="Próximo Mês"
+            aria-label="Próximo mês"
           >
             <PhCaretRight :size="15" weight="bold" />
           </button>
         </div>
 
         <!-- 3. Atalhos rápidos de Mês -->
-        <div class="grid grid-cols-2 md:inline-flex bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 items-center w-full md:w-auto">
+        <div class="hidden md:inline-flex bg-surface border border-white/10 rounded-xl p-1 gap-1 shadow-sm h-10 items-center">
           <button
             type="button"
             @click="goToPrevMonth"
@@ -405,112 +412,135 @@ const formatDate = (dateString: string) => {
       </div>
     </div>
 
-    <!-- Bento Grid de Métricas Financeiras -->
-    <div data-tour="kpi-cards" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <!-- Falha de carregamento: não mostrar R$ 0,00 como se fosse real -->
+    <Card v-if="txStore.dashboardLoadError && !txStore.dashboardLoading" class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-rose-500/25" role="alert">
+      <div class="flex items-center gap-3">
+        <PhWarningCircle :size="24" class="text-rose-400 shrink-0" weight="duotone" />
+        <div>
+          <p class="text-sm font-bold text-white">Não foi possível carregar os dados do mês</p>
+          <p class="text-xs text-white/50">Os valores abaixo podem estar desatualizados.</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        @click="loadDashboardData"
+        class="px-4 py-2 rounded-xl text-xs font-semibold border border-white/10 bg-white/5 hover:bg-white/10 transition-colors cursor-pointer self-start sm:self-center"
+      >
+        Tentar novamente
+      </button>
+    </Card>
+
+    <!-- Bento Grid de Métricas Financeiras (2x2 no mobile para caber acima da dobra) -->
+    <div
+      data-tour="kpi-cards"
+      class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 transition-opacity"
+      :class="{ 'opacity-50': txStore.dashboardLoading }"
+      :aria-busy="txStore.dashboardLoading"
+    >
       <!-- Card: Receitas -->
-      <div data-tour="kpi-card-primary" class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card data-tour="kpi-card-primary" class="p-4 sm:p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Receitas em {{ monthNames[selectedMonth] }}</span>
-          <div class="w-8 h-8 rounded-xl bg-accent/15 flex items-center justify-center text-accent">
+          <div class="hidden sm:flex w-8 h-8 rounded-xl bg-accent/15 items-center justify-center text-accent">
             <PhTrendUp :size="18" weight="bold" />
           </div>
         </div>
         <div>
-          <span class="text-2xl font-bold tracking-tight text-accent">
+          <span class="text-lg sm:text-2xl font-bold tracking-tight tabular-nums text-accent">
             {{ formatCurrency(totalIncome) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">Entradas confirmadas no período</p>
+          <p class="text-[11px] text-white/50 mt-1">Entradas confirmadas no período</p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Despesas -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-4 sm:p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Despesas em {{ monthNames[selectedMonth] }}</span>
-          <div class="w-8 h-8 rounded-xl bg-red-500/15 flex items-center justify-center text-red-400">
+          <div class="hidden sm:flex w-8 h-8 rounded-xl bg-red-500/15 items-center justify-center text-red-400">
             <PhTrendDown :size="18" weight="bold" />
           </div>
         </div>
         <div>
-          <span class="text-2xl font-bold tracking-tight text-red-400">
+          <span class="text-lg sm:text-2xl font-bold tracking-tight tabular-nums text-red-400">
             {{ formatCurrency(totalExpenses) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">
+          <p class="text-[11px] text-white/50 mt-1">
             <span v-if="totalAbated > 0" class="text-accent/80 font-medium">
               {{ formatCurrency(totalAbated) }} compensados
             </span>
             <span v-else>Gastos efetivados no período</span>
           </p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Saldo Líquido -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-4 sm:p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-white/50">Saldo Líquido</span>
-          <div class="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-400">
+          <div class="hidden sm:flex w-8 h-8 rounded-xl bg-blue-500/15 items-center justify-center text-blue-400">
             <PhWallet :size="18" weight="duotone" />
           </div>
         </div>
         <div>
           <span 
-            class="text-2xl font-bold tracking-tight"
+            class="text-lg sm:text-2xl font-bold tracking-tight tabular-nums"
             :class="netBalance >= 0 ? 'text-white' : 'text-red-400'"
           >
             {{ formatCurrency(netBalance) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">Receitas menãos despesas</p>
+          <p class="text-[11px] text-white/50 mt-1">Receitas menos despesas</p>
         </div>
-      </div>
+      </Card>
 
       <!-- Card: Saldo Projetado -->
-      <div class="bg-surface rounded-2xl p-5 border border-white/5 shadow-lg flex flex-col justify-between gap-3 min-h-[115px]">
+      <Card class="p-4 sm:p-5 flex flex-col justify-between gap-3 min-h-[115px]">
         <div class="flex items-center justify-between">
           <span class="text-xs font-semibold text-amber-400/90">Saldo Projetado</span>
-          <div class="w-8 h-8 rounded-xl bg-amber-500/15 flex items-center justify-center text-amber-400">
+          <div class="hidden sm:flex w-8 h-8 rounded-xl bg-amber-500/15 items-center justify-center text-amber-400">
             <PhClock :size="18" weight="bold" />
           </div>
         </div>
         <div>
           <span 
-            class="text-2xl font-bold tracking-tight text-amber-400"
+            class="text-lg sm:text-2xl font-bold tracking-tight tabular-nums text-amber-400"
           >
             {{ formatCurrency(projectedBalance) }}
           </span>
-          <p class="text-[11px] text-white/40 mt-1">
+          <p class="text-[11px] text-white/50 mt-1">
             Abatendo {{ formatCurrency(totalPlanned) }} em gastos previstos
           </p>
         </div>
-      </div>
+      </Card>
     </div>
 
     <!-- Linha Principal: Gráfico de Rosca e Últimas Transações -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Gráfico de Rosca: Despesas por Categoria -->
-      <div class="bg-surface rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col gap-4 min-h-[380px]">
+      <Card class="p-6 flex flex-col gap-4 min-h-[380px]">
         <div class="flex items-center justify-between">
           <h2 class="text-sm font-bold text-white tracking-wide">Gastos por Categoria</h2>
-          <span class="text-xs px-2 py-0.5 rounded-full bg-white/5 text-white/50">
+          <Badge variant="secondary">
             {{ monthNames[selectedMonth] }}
-          </span>
+          </Badge>
         </div>
 
         <div class="relative h-64 flex items-center justify-center">
-          <div v-if="txStore.dashboardLoading" class="text-xs text-white/40">Carregando dados...</div>
-          <div v-else-if="chartData.labels.length === 0" class="text-center text-white/40 text-xs flex flex-col gap-2">
+          <div v-if="txStore.dashboardLoading" class="text-xs text-white/50">Carregando dados...</div>
+          <div v-else-if="chartData.labels.length === 0" class="text-center text-white/50 text-xs flex flex-col gap-2">
             <span>Nenhuma despesa registrada neste mês.</span>
           </div>
           <Doughnut v-else :data="chartData" :options="chartOptions" />
         </div>
-      </div>
+      </Card>
 
       <!-- Tabela: Lançamentos Recentes do Mês -->
-      <div class="lg:col-span-2 bg-surface rounded-2xl p-6 border border-white/5 shadow-xl flex flex-col justify-between min-h-[380px]">
+      <Card class="lg:col-span-2 p-6 flex flex-col justify-between min-h-[380px]">
         <div class="flex flex-col gap-4">
           <div class="flex items-center justify-between">
             <div>
               <h2 class="text-sm font-bold text-white tracking-wide">Lançamentos de {{ monthDisplay }}</h2>
-              <p class="text-xs text-white/40 mt-0.5">Exibindo as transações registradas para este período</p>
+              <p class="text-xs text-white/50 mt-0.5">Exibindo as transações registradas para este período</p>
             </div>
             <router-link 
               to="/transactions" 
@@ -522,18 +552,29 @@ const formatDate = (dateString: string) => {
           </div>
 
           <!-- Lista de Lançamentos -->
-          <div v-if="txStore.dashboardLoading" class="py-12 text-center text-xs text-white/40">
+          <div v-if="txStore.dashboardLoading" class="py-12 text-center text-xs text-white/50">
             Carregando transações...
           </div>
           <div v-else-if="recentTransactions.length === 0" class="py-12 text-center flex flex-col items-center gap-2">
-            <span class="text-xs text-white/40">Nenhuma transação encontrada para este mês.</span>
-            <router-link 
-              to="/import"
-              class="text-xs text-accent hover:underline flex items-center gap-1 mt-1 font-medium"
-            >
-              <PhUploadSimple :size="15" />
-              <span>Importar extrato OFX</span>
-            </router-link>
+            <span class="text-xs text-white/50">Nenhuma transação encontrada para este mês.</span>
+            <div class="flex flex-wrap justify-center gap-2 mt-1">
+              <button
+                type="button"
+                @click="openImport?.()"
+                class="text-xs text-accent hover:underline flex items-center gap-1 px-2 py-2 font-medium cursor-pointer"
+              >
+                <PhUploadSimple :size="15" />
+                <span>Importar extrato OFX</span>
+              </button>
+              <button
+                type="button"
+                @click="openCreateTx?.()"
+                class="text-xs text-accent hover:underline flex items-center gap-1 px-2 py-2 font-medium cursor-pointer"
+              >
+                <PhPlus :size="15" />
+                <span>Novo lançamento</span>
+              </button>
+            </div>
           </div>
           <div v-else class="divide-y divide-white/5">
             <div 
@@ -562,7 +603,7 @@ const formatDate = (dateString: string) => {
                     >
                       {{ getTagById(t.tags[0])?.name }}
                     </span>
-                    <span class="text-[10px] text-white/40">{{ formatDate(t.date_posted) }}</span>
+                    <span class="text-[10px] text-white/50">{{ formatDate(t.date_posted) }}</span>
                   </div>
                 </div>
               </div>
@@ -584,7 +625,8 @@ const formatDate = (dateString: string) => {
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   </div>
 </template>
+
