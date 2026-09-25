@@ -9,7 +9,6 @@ const router = createRouter({
     { path: '/', component: () => import('../views/DashboardView.vue') },
     { path: '/transactions', component: () => import('../views/TransactionsView.vue') },
     { path: '/accounts', component: () => import('../views/AccountsView.vue') },
-    { path: '/import', component: () => import('../views/ImportView.vue') },
     { path: '/tags', component: () => import('../views/TagsView.vue') },
     { path: '/profile', component: () => import('../views/ProfileView.vue') },
     { path: '/billing', component: () => import('../views/BillingView.vue') },
@@ -20,9 +19,10 @@ const router = createRouter({
 
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
-  
+
   if (!to.meta.public && !authStore.isAuthenticated) {
-    next('/login');
+    // Guarda o link original: após o login, o usuário volta para ele em vez de cair sempre no Dashboard
+    next({ path: '/login', query: { redirect: to.fullPath } });
   } else if (to.meta.public && authStore.isAuthenticated) {
     next('/');
   } else {

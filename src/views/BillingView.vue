@@ -111,7 +111,7 @@ const handleApplyCoupon = async () => {
 </script>
 
 <template>
-  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8 select-none">
+  <div class="max-w-5xl mx-auto flex flex-col gap-8 select-none">
     
     <!-- Cabeçalho -->
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-white/5">
@@ -174,7 +174,7 @@ const handleApplyCoupon = async () => {
           <!-- Status da Assinatura -->
           <div class="flex items-center gap-3">
             <div class="text-right">
-              <span class="text-[11px] text-white/40 block">Status da Conta</span>
+              <span class="text-[11px] text-white/50 block">Status da Conta</span>
               <span class="text-xs font-semibold text-white capitalize">
                 {{ billingStore.planStatus?.subscription_status || 'Ativo' }}
               </span>
@@ -212,7 +212,7 @@ const handleApplyCoupon = async () => {
               ></div>
             </div>
 
-            <p class="text-[11px] text-white/40">
+            <p class="text-[11px] text-white/50">
               <template v-if="billingStore.isAccountsUnlimited">
                 Contas conectadas ilimitadas liberadas no seu plano.
               </template>
@@ -245,7 +245,7 @@ const handleApplyCoupon = async () => {
               ></div>
             </div>
 
-            <p class="text-[11px] text-white/40">
+            <p class="text-[11px] text-white/50">
               <template v-if="billingStore.isPro">
                 Até 8 pessoas podem compartilhar a gestão financeira.
               </template>
@@ -277,7 +277,7 @@ const handleApplyCoupon = async () => {
               ></div>
             </div>
 
-            <p class="text-[11px] text-white/40">
+            <p class="text-[11px] text-white/50">
               <template v-if="billingStore.isHistoryUnlimited">
                 Extratos guardados permanentemente para comparativos.
               </template>
@@ -320,7 +320,7 @@ const handleApplyCoupon = async () => {
             <div>
               <div class="flex items-baseline gap-1">
                 <span class="text-3xl font-extrabold text-white">R$ 0</span>
-                <span class="text-xs text-white/40">/mês para sempre</span>
+                <span class="text-xs text-white/50">/mês para sempre</span>
               </div>
               <p class="text-xs text-white/60 mt-1">
                 Perfeito para começar a organizar despesas essenciais.
@@ -346,9 +346,9 @@ const handleApplyCoupon = async () => {
               </li>
               <li class="flex items-center gap-2.5">
                 <PhCheck :size="16" class="text-accent shrink-0" weight="bold" />
-                <span>Classificador Inteligente <strong>Naive Bayes</strong></span>
+                <span>Categorização automática com <strong>IA</strong></span>
               </li>
-              <li class="flex items-center gap-2.5 text-white/30">
+              <li class="flex items-center gap-2.5 text-white/50">
                 <PhX :size="16" class="text-white/20 shrink-0" weight="bold" />
                 <span>Relatórios comparativos plurianuais</span>
               </li>
@@ -366,7 +366,7 @@ const handleApplyCoupon = async () => {
             >
               Alternar para Plano Free
             </Button>
-            <div v-else class="text-center text-xs text-white/40 py-2">
+            <div v-else class="text-center text-xs text-white/50 py-2">
               Plano base ativado
             </div>
           </div>
@@ -395,7 +395,7 @@ const handleApplyCoupon = async () => {
               <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Plano Pro</span>
               <div class="flex items-baseline gap-1 mt-1">
                 <span class="text-3xl font-extrabold text-white">R$ 19,90</span>
-                <span class="text-xs text-white/40">/mês (valor previsto)</span>
+                <span class="text-xs text-white/50">/mês (valor previsto)</span>
               </div>
               <p class="text-xs text-white/60 mt-1">
                 Sem travas ou limites para famílias que desejam total controle financeiro.
@@ -421,7 +421,7 @@ const handleApplyCoupon = async () => {
               </li>
               <li class="flex items-center gap-2.5">
                 <PhCheck :size="16" class="text-emerald-400 shrink-0" weight="bold" />
-                <span>Classificador de IA Naive Bayes e regras automáticas</span>
+                <span>Categorização com IA e regras automáticas</span>
               </li>
               <li class="flex items-center gap-2.5">
                 <PhCheck :size="16" class="text-emerald-400 shrink-0" weight="bold" />
@@ -492,7 +492,7 @@ const handleApplyCoupon = async () => {
           </p>
         </div>
 
-        <div class="p-3 rounded-xl bg-bg/40 border border-white/5 text-[11px] text-white/40 flex items-start gap-2">
+        <div class="p-3 rounded-xl bg-bg/40 border border-white/5 text-[11px] text-white/50 flex items-start gap-2">
           <PhInfo :size="15" class="text-accent shrink-0 mt-0.5" />
           <span>Dica: experimente usar o código <strong>AMIGO100</strong> para testar a ativação do plano vitalício.</span>
         </div>
@@ -542,7 +542,7 @@ const handleApplyCoupon = async () => {
           </div>
         </div>
 
-        <div class="p-3 rounded-xl bg-bg/40 border border-white/5 text-[11px] text-white/40 flex items-start gap-2">
+        <div class="p-3 rounded-xl bg-bg/40 border border-white/5 text-[11px] text-white/50 flex items-start gap-2">
           <PhShieldCheck :size="15" class="text-emerald-400 shrink-0 mt-0.5" />
           <span>As travas do banco de dados (máx. 2 contas e 2 membros no plano Free) respondem dinamicamente a essas alterações.</span>
         </div>

@@ -77,7 +77,7 @@ const handleGoToImport = () => {
         </div>
         <button 
           @click="handleClose" 
-          class="text-white/40 hover:text-white p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
+          class="text-white/50 hover:text-white p-2 rounded-xl hover:bg-white/5 transition-colors cursor-pointer"
         >
           <PhX :size="20" />
         </button>

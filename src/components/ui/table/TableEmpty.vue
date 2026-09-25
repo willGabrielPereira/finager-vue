@@ -16,7 +16,7 @@ const props = withDefaults(defineProps<Props>(), {
 
 <template>
   <TableRow>
-    <TableCell :colspan="colspan" :class="cn('p-8 text-center text-sm text-white/40', props.class)">
+    <TableCell :colspan="colspan" :class="cn('p-8 text-center text-sm text-white/50', props.class)">
       <slot />
     </TableCell>
   </TableRow>

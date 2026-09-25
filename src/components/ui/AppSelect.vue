@@ -209,7 +209,7 @@ onBeforeUnmount(() => {
 
       <!-- Ícone customizado de seta -->
       <template #caret>
-        <div class="mr-2.5 text-white/40 group-hover:text-white/70 transition-colors pointer-events-none">
+        <div class="mr-2.5 text-white/50 group-hover:text-white/70 transition-colors pointer-events-none">
           <PhCaretDown :size="14" weight="bold" />
         </div>
       </template>
@@ -219,7 +219,7 @@ onBeforeUnmount(() => {
         <button 
           type="button" 
           @click.stop="clear" 
-          class="mr-1 text-white/40 hover:text-white transition-colors cursor-pointer p-0.5"
+          class="mr-1 text-white/50 hover:text-white transition-colors cursor-pointer p-0.5"
           title="Limpar seleção"
         >
           <PhX :size="13" weight="bold" />

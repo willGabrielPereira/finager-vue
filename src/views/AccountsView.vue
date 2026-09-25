@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import { useBillingStore } from '../stores/billing'
 import { useRouter } from 'vue-router'
 import { showAlert, toast } from '../utils/feedback'
+import { minLengthText } from '@/validation/schemas'
 import { 
   PhBank, 
   PhPlus, 
@@ -126,10 +127,12 @@ const closeModal = () => {
 
 const handleSave = async () => {
   formError.value = ''
-  if (!form.value.name.trim() || form.value.name.trim().length < 2) {
-    formError.value = 'O nome da conta deve conter pelo menos 2 caracteres.'
+  const nameCheck = minLengthText(2, 'O nome da conta deve conter pelo menos 2 caracteres.').safeParse(form.value.name)
+  if (!nameCheck.success) {
+    formError.value = nameCheck.error.issues[0].message
     return
   }
+  form.value.name = nameCheck.data
 
   submitting.value = true
   try {
@@ -145,8 +148,10 @@ const handleSave = async () => {
 
     if (isEditing.value && editingId.value) {
       await accountsStore.updateAccount(editingId.value, payload)
+      toast.success('Conta atualizada.')
     } else {
       await accountsStore.createAccount(payload)
+      toast.success('Conta criada.', 'Agora você já pode importar o extrato OFX dela.')
     }
 
     closeModal()
@@ -160,9 +165,11 @@ const handleSave = async () => {
 
 const handleDelete = async (acc: Account) => {
   const confirmed = await showAlert.confirm({
-    title: `Excluir a conta "${acc.name}"?`,
-    text: 'Todas as transações vinculadas a ela poderão ser afetadas.',
-    confirmText: 'Sim, excluir',
+    // Nome digitado pelo usuário: o SweetAlert2 renderiza `title` como HTML (não escapa),
+    // então nunca interpole dado de usuário ali — só em `text`, que vai como texto puro.
+    title: 'Excluir conta bancária?',
+    text: `A conta "${acc.name}" e todas as suas transações serão excluídas permanentemente. Esta ação não pode ser desfeita.`,
+    confirmText: 'Excluir conta e transações',
     cancelText: 'Cancelar',
     isDestructive: true,
   })
@@ -282,7 +289,7 @@ const getTypeBadgeClass = (type?: string) => {
     </div>
 
     <!-- Cards Resumo -->
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+    <div class="hidden sm:grid grid-cols-3 gap-3">
       <Card class="p-4 flex items-center gap-3.5 shadow-sm">
         <div class="w-10 h-10 rounded-xl bg-accent/15 border border-accent/30 text-accent flex items-center justify-center">
           <PhBank :size="22" weight="duotone" />
@@ -315,12 +322,12 @@ const getTypeBadgeClass = (type?: string) => {
     </div>
 
     <!-- Lista de Contas -->
-    <div v-if="accountsStore.loading" class="p-12 text-center text-white/40 text-sm">
+    <div v-if="accountsStore.loading" class="p-12 text-center text-white/50 text-sm">
       Carregando contas...
     </div>
 
     <Card v-else-if="accountsStore.accounts.length === 0" class="p-8 text-center flex flex-col items-center justify-center gap-3">
-      <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white/40 flex items-center justify-center">
+      <div class="w-14 h-14 rounded-2xl bg-white/5 border border-white/10 text-white/50 flex items-center justify-center">
         <PhBank :size="28" weight="duotone" />
       </div>
       <h3 class="text-base font-bold text-white">Nenhuma conta cadastrada</h3>
@@ -361,16 +368,18 @@ const getTypeBadgeClass = (type?: string) => {
             <button
               type="button"
               @click="openEditModal(acc)"
-              class="p-1.5 rounded-lg text-white/50 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-              title="Editar Conta"
+              class="p-2.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+              title="Editar conta"
+              aria-label="Editar conta"
             >
               <PhPencilSimple :size="16" />
             </button>
             <button
               type="button"
               @click="handleDelete(acc)"
-              class="p-1.5 rounded-lg text-rose-400/60 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
-              title="Excluir Conta"
+              class="p-2.5 rounded-lg text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10 transition-all cursor-pointer"
+              title="Excluir conta"
+              aria-label="Excluir conta"
             >
               <PhTrash :size="16" />
             </button>
@@ -416,8 +425,9 @@ const getTypeBadgeClass = (type?: string) => {
 
         <form @submit.prevent="handleSave" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome Identificador da Conta</label>
+            <label for="account-form-name" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da conta</label>
             <Input
+              id="account-form-name"
               v-model="form.name"
               type="text"
               placeholder="ex: Nubank Principal, Itaú Salário, Cartão XP"
@@ -427,7 +437,7 @@ const getTypeBadgeClass = (type?: string) => {
 
           <!-- Instituição -->
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Instituição Financeira</label>
+            <label for="account-form-institution" class="text-xs font-semibold text-white/80 mb-1.5 block">Instituição financeira</label>
             <div class="grid grid-cols-3 gap-2 mb-2">
               <button
                 v-for="b in popularBanks.slice(0, 6)"
@@ -443,6 +453,7 @@ const getTypeBadgeClass = (type?: string) => {
               </button>
             </div>
             <Input
+              id="account-form-institution"
               v-model="form.institution"
               type="text"
               placeholder="Ou digite o nome do banco/corretora"
@@ -523,7 +534,7 @@ const getTypeBadgeClass = (type?: string) => {
               />
               <span>Tornar esta conta privada (apenas eu posso visualizar e lançar nela)</span>
             </label>
-            <p class="text-[11px] text-white/40">
+            <p class="text-[11px] text-white/50">
               Contas conjuntas ficam visíveis para todos os membros que você convidar para a família.
             </p>
           </div>

@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, markRaw } from 'vue'
+import { useRouter } from 'vue-router'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 import AppSelect, { type AppSelectOption } from './AppSelect.vue'
 import { PhBank, PhCreditCard } from '@phosphor-icons/vue'
 import { useAccountsStore } from '../../stores/accounts'
@@ -13,7 +15,7 @@ import {
   PhCircleNotch
 } from '@phosphor-icons/vue'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
 }>()
 
@@ -23,6 +25,7 @@ const emit = defineEmits<{
 }>()
 
 const accountsStore = useAccountsStore()
+const router = useRouter()
 
 const selectedAccountId = ref('')
 const selectedFile = ref<File | null>(null)
@@ -30,6 +33,7 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 const importing = ref(false)
 const importError = ref('')
 const importResult = ref<{ inserted: number; skipped: number; reconciled: number } | null>(null)
+const hasAccounts = computed(() => accountsStore.accounts.length > 0)
 
 const accountOptions = computed<AppSelectOption[]>(() => {
   return accountsStore.accounts.map(acc => ({
@@ -45,10 +49,19 @@ onMounted(() => {
   if (accountsStore.accounts.length === 0) {
     accountsStore.fetchAccounts()
   }
-  if (accountsStore.accounts.length > 0) {
-    selectedAccountId.value = accountsStore.accounts[0].id
-  }
 })
+
+useEscapeKey(() => props.isOpen && !importing.value, () => reset())
+
+const goToAccounts = () => {
+  reset()
+  router.push('/accounts')
+}
+
+const goToTransactions = () => {
+  reset()
+  router.push('/transactions')
+}
 
 const handleFileChange = (e: Event) => {
   const target = e.target as HTMLInputElement
@@ -66,12 +79,8 @@ const handleDrop = (e: DragEvent) => {
 }
 
 const submit = async () => {
-  if (!selectedAccountId.value && accountsStore.accounts.length > 0) {
-    selectedAccountId.value = accountsStore.accounts[0].id
-  }
-
   if (!selectedAccountId.value) {
-    importError.value = 'Selecione a conta bancária de origem'
+    importError.value = 'Selecione a conta em que o extrato será importado.'
     return
   }
   if (!selectedFile.value) {
@@ -109,6 +118,7 @@ const submit = async () => {
 }
 
 const reset = () => {
+  selectedAccountId.value = ''
   selectedFile.value = null
   importResult.value = null
   importError.value = ''
@@ -120,21 +130,26 @@ const reset = () => {
   <div 
     v-if="isOpen"
     class="fixed inset-0 z-[10002] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
-    @click="reset"
+    @click="!importing && reset()"
   >
-    <div 
+    <div
       class="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar p-5 sm:p-6 relative gap-4 animate-in zoom-in-95 duration-200 text-white my-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="import-ofx-title"
       @click.stop
     >
-      <button 
-        @click="reset" 
-        class="absolute top-4 right-4 text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+      <button
+        @click="reset"
+        :disabled="importing"
+        aria-label="Fechar"
+        class="absolute top-3 right-3 text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
       >
         <PhX :size="20" />
       </button>
 
       <div>
-        <h3 class="text-xl font-bold">Importar Extrato OFX</h3>
+        <h3 id="import-ofx-title" class="text-xl font-bold">Importar Extrato OFX</h3>
         <p class="text-xs text-white/50">Suporta contas correntes e cartões de crédito (Nubank, Santander, etc.)</p>
       </div>
 
@@ -156,17 +171,39 @@ const reset = () => {
             <div class="text-xl font-bold text-blue-400 mt-0.5">{{ importResult.reconciled }}</div>
           </div>
           <div class="text-center">
-            <span class="text-[10px] text-white/50 uppercase font-semibold">Ignoradas</span>
-            <div class="text-xl font-bold text-white/40 mt-0.5">{{ importResult.skipped }}</div>
+            <span class="text-[10px] text-white/50 uppercase font-semibold">Já existiam</span>
+            <div class="text-xl font-bold text-white/50 mt-0.5">{{ importResult.skipped }}</div>
           </div>
         </div>
 
-        <Button 
-          type="button"
-          @click="reset"
-          class="w-full bg-accent text-bg font-bold text-xs hover:opacity-90 mt-1"
-        >
-          Concluir
+        <div class="w-full flex gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            @click="goToTransactions"
+            class="flex-1 text-xs font-bold"
+          >
+            Ver Transações
+          </Button>
+          <Button
+            type="button"
+            @click="reset"
+            class="flex-1 bg-accent text-bg font-bold text-xs hover:opacity-90"
+          >
+            Concluir
+          </Button>
+        </div>
+      </div>
+
+      <!-- Sem contas cadastradas: não dá para importar sem uma conta de destino -->
+      <div v-else-if="!hasAccounts" class="flex flex-col items-center gap-3 py-2 text-center">
+        <div class="w-12 h-12 rounded-2xl bg-white/5 border border-white/10 text-white/50 flex items-center justify-center">
+          <PhBank :size="24" weight="duotone" />
+        </div>
+        <p class="text-xs text-white/70">Você ainda não tem uma conta bancária cadastrada. Crie uma para poder importar o extrato.</p>
+        <Button type="button" size="sm" class="gap-1.5 font-bold" @click="goToAccounts">
+          <PhBank :size="14" weight="bold" />
+          <span>Cadastrar Conta</span>
         </Button>
       </div>
 
@@ -177,7 +214,7 @@ const reset = () => {
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-white/70">Conta Bancária de Destino</label>
+          <label class="text-xs font-semibold text-white/70">Importar na conta <span class="text-rose-400" aria-hidden="true">*</span></label>
           <AppSelect
             v-model="selectedAccountId"
             :options="accountOptions"
@@ -206,11 +243,14 @@ const reset = () => {
 
           <div v-if="selectedFile">
             <p class="text-xs font-bold text-white">{{ selectedFile.name }}</p>
-            <p class="text-[10px] text-white/40 mt-0.5">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
+            <p class="text-[10px] text-white/50 mt-0.5">{{ (selectedFile.size / 1024).toFixed(1) }} KB</p>
           </div>
           <div v-else>
-            <p class="text-xs font-semibold text-white/80">Arraste seu arquivo .OFX aqui</p>
-            <p class="text-[10px] text-white/40 mt-0.5">ou clique para selecionar</p>
+            <p class="text-xs font-semibold text-white/80">
+              <span class="md:hidden">Toque para escolher o arquivo .OFX</span>
+              <span class="hidden md:inline">Arraste seu arquivo .OFX aqui</span>
+            </p>
+            <p class="hidden md:block text-[11px] text-white/50 mt-0.5">ou clique para selecionar</p>
           </div>
         </div>
 
@@ -219,6 +259,7 @@ const reset = () => {
             type="button"
             variant="ghost"
             size="sm"
+            :disabled="importing"
             @click="reset"
           >
             Cancelar

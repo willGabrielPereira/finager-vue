@@ -115,8 +115,10 @@ export const useAuthStore = defineStore('auth', {
 
     async joinFamily(token: string) {
       const { data } = await api.post('/family/join', { token });
-      await this.fetchMe();
-      await this.fetchFamilyMembers();
+      // O access token ainda carrega a família antiga nas claims: renova a sessão
+      // (o /auth/refresh relê o usuário no banco e emite o token com a nova família)
+      const { data: tokens } = await api.post('/auth/refresh', { refresh_token: this.refreshToken });
+      this.setTokens(tokens.access_token, tokens.refresh_token);
       return data;
     },
 

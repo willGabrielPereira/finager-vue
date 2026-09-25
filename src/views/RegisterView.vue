@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { getRedirectTarget } from '@/utils/authRedirect'
+import { registerSchema } from '@/validation/schemas'
+import { useFormValidation } from '@/composables/useFormValidation'
 import { useAuthStore } from '../stores/auth'
 import { 
   PhWallet, 
@@ -29,6 +32,7 @@ const inviteFamilyName = ref('')
 const loading = ref(false)
 const validatingInvite = ref(false)
 const errorMsg = ref('')
+const { validate, firstError } = useFormValidation(registerSchema)
 
 onMounted(async () => {
   const inviteParam = route.query.invite as string
@@ -55,25 +59,14 @@ onMounted(async () => {
 const handleRegister = async () => {
   errorMsg.value = ''
 
-  if (!login.value.trim() || !email.value.trim() || !password.value) {
-    errorMsg.value = 'Preencha todos os campos obrigatórios.'
-    return
-  }
-  if (login.value.trim().length < 4) {
-    errorMsg.value = 'O nome de usuário deve conter pelo menos 4 caracteres.'
-    return
-  }
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email.value.trim())) {
-    errorMsg.value = 'Informe um endereço de e-mail válido.'
-    return
-  }
-  if (password.value.length < 8) {
-    errorMsg.value = 'A senha deve conter no mínimo 8 caracteres.'
-    return
-  }
-  if (password.value !== confirmPassword.value) {
-    errorMsg.value = 'As senhas digitadas não coincidem.'
+  const data = validate({
+    login: login.value,
+    email: email.value,
+    password: password.value,
+    confirmPassword: confirmPassword.value,
+  })
+  if (!data) {
+    errorMsg.value = firstError.value
     return
   }
 
@@ -81,13 +74,13 @@ const handleRegister = async () => {
 
   try {
     await auth.register(
-      login.value.trim(),
-      email.value.trim(),
-      password.value,
+      data.login,
+      data.email,
+      data.password,
       inviteToken.value ? undefined : familyName.value.trim(),
       inviteToken.value || undefined
     )
-    router.push('/')
+    router.push(getRedirectTarget(route.query))
   } catch (err: any) {
     if (err.response?.data?.errors && Array.isArray(err.response.data.errors)) {
       errorMsg.value = err.response.data.errors.map((e: any) => e.message).join(' | ')
@@ -129,11 +122,11 @@ const handleRegister = async () => {
       <form @submit.prevent="handleRegister" class="flex flex-col gap-4">
         <!-- Login -->
         <div>
-          <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+          <label for="register-login" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
             <PhUserPlus :size="14" />
             <span>Nome de Usuário</span>
           </label>
-          <Input 
+          <Input id="register-login" 
             v-model="login"
             type="text" 
             placeholder="ex: william"
@@ -144,11 +137,11 @@ const handleRegister = async () => {
 
         <!-- E-mail -->
         <div>
-          <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+          <label for="register-email" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
             <PhEnvelopeSimple :size="14" />
             <span>Endereço de E-mail</span>
           </label>
-          <Input 
+          <Input id="register-email" 
             v-model="email"
             type="email" 
             placeholder="ex: william@email.com"
@@ -161,11 +154,11 @@ const handleRegister = async () => {
 
         <!-- Nome da Família (ocultado se veio com convite) -->
         <div v-if="!inviteFamilyName">
-          <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+          <label for="register-family" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
             <PhHouse :size="14" />
             <span>Nome da Família / Espaço (opcional)</span>
           </label>
-          <Input 
+          <Input id="register-family" 
             v-model="familyName"
             type="text" 
             placeholder="ex: Família Pereira"
@@ -174,11 +167,11 @@ const handleRegister = async () => {
         
         <!-- Senha -->
         <div>
-          <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+          <label for="register-password" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
             <PhLock :size="14" />
             <span>Senha (mínimo 8 caracteres)</span>
           </label>
-          <Input 
+          <Input id="register-password" 
             v-model="password"
             type="password" 
             placeholder="••••••••"
@@ -189,11 +182,11 @@ const handleRegister = async () => {
 
         <!-- Confirmação de Senha -->
         <div>
-          <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+          <label for="register-confirm" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
             <PhLock :size="14" />
             <span>Confirme a Senha</span>
           </label>
-          <Input 
+          <Input id="register-confirm" 
             v-model="confirmPassword"
             type="password" 
             placeholder="••••••••"
@@ -202,7 +195,7 @@ const handleRegister = async () => {
           />
         </div>
         
-        <div v-if="errorMsg" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl text-center">
+        <div v-if="errorMsg" role="alert" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl text-center">
           {{ errorMsg }}
         </div>
         
@@ -219,7 +212,7 @@ const handleRegister = async () => {
       
       <div class="mt-6 text-center text-xs sm:text-sm text-white/50">
         Já tem uma conta? 
-        <router-link to="/login" class="text-accent font-semibold hover:underline">Faça login</router-link>
+        <router-link :to="{ path: '/login', query: route.query }" class="text-accent font-semibold hover:underline">Faça login</router-link>
       </div>
     </Card>
   </div>

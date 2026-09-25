@@ -28,7 +28,7 @@ export function startInteractiveTour(router?: Router, onComplete?: () => void) {
     {
       route: '/',
       getElement: () => resolveTarget('[data-tour="brand"]', '[data-tour="brand-mobile"]'),
-      title: 'Bem-vindo ao Finager! 👋',
+      title: 'Bem-vindo ao Finager!',
       description: isMobile
         ? 'Sua plataforma de gestão financeira familiar. Vamos fazer um tour guiado de 1 minuto para você conhecer cada recurso!'
         : 'Sua plataforma inteligente de gestão financeira pessoal e familiar. Vamos fazer um tour guiado de 1 minuto conhecendo cada tela!',
@@ -40,7 +40,7 @@ export function startInteractiveTour(router?: Router, onComplete?: () => void) {
       getElement: () => isMobile 
         ? resolveTarget('[data-tour="kpi-card-primary"]', '[data-tour="kpi-cards"]')
         : resolveTarget('[data-tour="kpi-cards"]'),
-      title: 'Painel Geral & Métricas 📊',
+      title: 'Painel Geral & Métricas',
       description: 'Aqui você acompanha instantaneamente o fluxo de caixa do mês: receitas confirmadas, despesas abatidas, saldo líquido real e projeção de gastos futuros.',
       side: 'bottom',
       align: 'center'
@@ -48,23 +48,25 @@ export function startInteractiveTour(router?: Router, onComplete?: () => void) {
     {
       route: '/accounts',
       getElement: () => resolveTarget('[data-tour="accounts-header"]', '[data-tour="accounts-new-btn"]'),
-      title: 'Contas Bancárias 🏦',
+      title: 'Contas Bancárias',
       description: 'Nesta tela você cadastra suas contas correntes, cartões e investimentos. Cada conta pode ser compartilhada com a família ou mantida 100% privada.',
       side: isMobile ? 'bottom' : 'bottom',
       align: 'center'
     },
     {
-      route: '/import',
-      getElement: () => resolveTarget('[data-tour="import-box"]'),
-      title: 'A Mágica do Extrato OFX 📥',
-      description: 'Segurança absoluta: não pedimos sua senha bancária. Basta baixar o extrato .OFX no seu banco (Nubank, Inter, Itaú, Bradesco, etc.) e subir aqui com 1 clique!',
-      side: 'bottom',
+      route: '/',
+      getElement: () => resolveTarget(
+        isMobile ? '[data-tour="mobile-action-btn"]' : '[data-tour="sidebar-import-btn"]'
+      ),
+      title: 'A Mágica do Extrato OFX',
+      description: 'Segurança absoluta: não pedimos sua senha bancária. Basta baixar o extrato .OFX no seu banco (Nubank, Inter, Itaú, Bradesco, etc.) e importar aqui com 1 clique!',
+      side: isMobile ? 'top' : 'right',
       align: 'center'
     },
     {
       route: '/transactions',
       getElement: () => resolveTarget('[data-tour="transactions-header"]'),
-      title: 'Extrato & Categorias 📑',
+      title: 'Extrato & Categorias',
       description: 'Todas as movimentações ficam reunidas aqui com busca instantânea, conciliação e categorização automática inteligente que aprende com você.',
       side: 'bottom',
       align: 'center'
@@ -72,7 +74,7 @@ export function startInteractiveTour(router?: Router, onComplete?: () => void) {
     {
       route: '/profile',
       getElement: () => resolveTarget('[data-tour="profile-family-card"]'),
-      title: 'Sua Família & Configurações 👨‍👩‍👧‍👦',
+      title: 'Sua Família & Configurações',
       description: 'Convide quem divide as contas com você (cônjuge, filhos) para gerenciar em conjunto. Aqui você também acessa o Guia de Bancos sempre que precisar!',
       side: isMobile ? 'top' : 'top',
       align: 'center'
@@ -111,9 +113,9 @@ export function startInteractiveTour(router?: Router, onComplete?: () => void) {
     allowClose: true,
     showProgress: true,
     progressText: 'Passo {{current}} de {{total}}',
-    nextBtnText: 'Próximo →',
-    prevBtnText: '← Anterior',
-    doneBtnText: 'Concluir Tour 🚀',
+    nextBtnText: 'Próximo',
+    prevBtnText: 'Anterior',
+    doneBtnText: 'Concluir Tour',
     popoverClass: 'finager-tour-theme',
     stagePadding: 6,
     stageRadius: 14,

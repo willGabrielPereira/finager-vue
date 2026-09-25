@@ -16,6 +16,7 @@ import {
   PhCaretDown
 } from '@phosphor-icons/vue'
 import { cn } from '@/lib/utils'
+import { toast } from '@/utils/feedback'
 
 interface Props {
   modelValue?: string | null
@@ -127,6 +128,8 @@ const handleCreateTag = async () => {
     if (created && created.id) {
       selectCategory(created.id)
     }
+  } catch (err: any) {
+    toast.error('Categoria não criada', err.response?.data?.message || err.response?.data?.error || 'Tente novamente.')
   } finally {
     isCreating.value = false
   }
@@ -166,10 +169,10 @@ const handleKeydown = (e: KeyboardEvent) => {
         :disabled="disabled"
         :class="
           cn(
-            'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer border max-w-full truncate',
+            'inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:py-1 rounded-lg text-xs font-medium transition-all duration-150 cursor-pointer border max-w-full truncate',
             selectedTag
               ? 'bg-surface-2/90 border-white/10 hover:border-white/20 text-white'
-              : 'bg-white/[0.03] border-dashed border-white/15 text-white/40 hover:text-white/70 hover:bg-white/[0.06]',
+              : 'bg-white/[0.03] border-dashed border-white/15 text-white/50 hover:text-white/70 hover:bg-white/[0.06]',
             disabled && 'opacity-50 cursor-not-allowed',
             props.class
           )
@@ -180,7 +183,7 @@ const handleKeydown = (e: KeyboardEvent) => {
           class="w-2 h-2 rounded-full shrink-0"
           :style="{ backgroundColor: selectedTag.color || '#22c55e' }"
         />
-        <PhTag v-else :size="12" class="shrink-0 text-white/30" />
+        <PhTag v-else :size="12" class="shrink-0 text-white/50" />
         <span class="truncate">{{ selectedTag ? selectedTag.name : placeholder }}</span>
       </button>
 
@@ -206,22 +209,23 @@ const handleKeydown = (e: KeyboardEvent) => {
             <span class="text-white font-medium truncate">{{ selectedTag.name }}</span>
           </template>
           <template v-else>
-            <PhTag :size="16" class="text-white/30 shrink-0" />
-            <span class="text-white/40">{{ placeholder }}</span>
+            <PhTag :size="16" class="text-white/50 shrink-0" />
+            <span class="text-white/50">{{ placeholder }}</span>
           </template>
         </div>
 
         <div class="flex items-center gap-1 shrink-0 ml-2">
-          <button
+          <span
             v-if="clearable && selectedTag && !disabled"
-            type="button"
-            class="p-1 text-white/40 hover:text-rose-400 transition-colors cursor-pointer rounded"
-            title="Remover Categoria"
+            role="button"
+            aria-label="Remover categoria"
+            class="p-1.5 text-white/50 hover:text-rose-400 transition-colors cursor-pointer rounded"
+            title="Remover categoria"
             @click="clearCategory"
           >
             <PhX :size="14" />
-          </button>
-          <PhCaretDown :size="14" class="text-white/40 transition-transform" :class="{ 'rotate-180': isOpen }" />
+          </span>
+          <PhCaretDown :size="14" class="text-white/50 transition-transform" :class="{ 'rotate-180': isOpen }" />
         </div>
       </button>
     </PopoverTrigger>
@@ -233,19 +237,21 @@ const handleKeydown = (e: KeyboardEvent) => {
     >
       <!-- Campo de Busca -->
       <div class="p-3 border-b border-white/5 flex items-center gap-2 bg-surface-2/40">
-        <PhMagnifyingGlass :size="16" class="text-white/40 shrink-0" />
+        <PhMagnifyingGlass :size="16" class="text-white/50 shrink-0" />
         <input
           ref="searchInput"
           v-model="searchQuery"
           type="text"
           placeholder="Buscar ou criar categoria..."
-          class="w-full bg-transparent text-sm text-white placeholder-white/30 outline-none"
+          aria-label="Buscar ou criar categoria"
+          class="w-full bg-transparent text-base sm:text-sm text-white placeholder-white/40 outline-none"
           @keydown="handleKeydown"
         />
         <button
           v-if="searchQuery"
           type="button"
-          class="text-white/30 hover:text-white p-0.5"
+          aria-label="Limpar busca"
+          class="text-white/50 hover:text-white p-1.5 cursor-pointer"
           @click="searchQuery = ''"
         >
           <PhX :size="14" />
@@ -257,7 +263,7 @@ const handleKeydown = (e: KeyboardEvent) => {
         v-if="!searchQuery && tagsStore.frequentTags.length > 0"
         class="p-2.5 border-b border-white/5 bg-surface-2/20"
       >
-        <div class="text-[10px] font-semibold tracking-wider uppercase text-white/40 mb-1.5 flex items-center gap-1">
+        <div class="text-[10px] font-semibold tracking-wider uppercase text-white/50 mb-1.5 flex items-center gap-1">
           <PhClockCounterClockwise :size="12" />
           <span>Frequentes</span>
         </div>
@@ -323,22 +329,27 @@ const handleKeydown = (e: KeyboardEvent) => {
 
             <!-- Ação secundária para alternar tag adicional (se aplicável) -->
             <button
-              v-if="allowSecondaryTags"
+              v-if="allowSecondaryTags && modelValue !== tag.id"
               type="button"
-              class="p-1 rounded hover:bg-white/10 text-white/30 hover:text-white"
-              :title="secondaryTags.includes(tag.id) ? 'Remover tag secundária' : 'Adicionar tag secundária'"
+              class="px-2 py-1 rounded-md text-[10px] font-semibold border transition-colors cursor-pointer"
+              :class="secondaryTags.includes(tag.id)
+                ? 'bg-accent/15 border-accent/40 text-accent'
+                : 'border-white/10 text-white/50 hover:text-white hover:border-white/30'"
+              :aria-pressed="secondaryTags.includes(tag.id)"
+              :title="secondaryTags.includes(tag.id) ? 'Remover como categoria extra' : 'Adicionar como categoria extra (além da principal)'"
               @click.stop="toggleSecondary(tag.id)"
             >
-              <span
-                class="block w-1.5 h-1.5 rounded-full"
-                :class="secondaryTags.includes(tag.id) ? 'bg-accent' : 'border border-white/40'"
-              />
+              <span class="inline-flex items-center gap-0.5">
+                <PhCheck v-if="secondaryTags.includes(tag.id)" :size="10" weight="bold" />
+                <PhPlus v-else :size="10" weight="bold" />
+                extra
+              </span>
             </button>
           </div>
         </div>
 
         <!-- Mensagem de Nenhuma Categoria Encontrada -->
-        <div v-if="filteredTags.length === 0 && !searchQuery" class="p-4 text-center text-xs text-white/40">
+        <div v-if="filteredTags.length === 0 && !searchQuery" class="p-4 text-center text-xs text-white/50">
           Nenhuma categoria cadastrada.
         </div>
       </div>

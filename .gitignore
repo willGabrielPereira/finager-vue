@@ -13,6 +13,10 @@ dist-ssr
 *.local
 .env
 
+# oh-my-claudecode runtime state (plans, logs, session data) — .omc/skills/** stays committable
+.omc/*
+!.omc/skills/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

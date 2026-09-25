@@ -3,6 +3,9 @@ import { ref, computed, onMounted } from 'vue'
 import { api } from '../api/axios'
 import { useTagsStore } from '../stores/tags'
 import { showAlert, toast } from '../utils/feedback'
+import { z } from 'zod'
+import { requiredText } from '@/validation/schemas'
+import { useFormValidation } from '@/composables/useFormValidation'
 import { 
   PhListDashes, 
   PhPlus, 
@@ -54,6 +57,7 @@ const fetchRules = async () => {
     rules.value = data || []
   } catch (err) {
     console.error('Falha ao buscar regras de estabelecimentos', err)
+    toast.error('Erro ao carregar regras', 'Não foi possível listar as regras. Recarregue a página.')
   } finally {
     loading.value = false
   }
@@ -75,9 +79,16 @@ const filteredRules = computed(() => {
   )
 })
 
+const ruleSchema = z.object({
+  pattern: requiredText('Informe o nome do estabelecimento.'),
+  tagId: requiredText('Selecione a categoria.'),
+})
+const ruleForm = useFormValidation(ruleSchema)
+
 const handleCreateRule = async () => {
-  if (!newPattern.value.trim() || !newTagId.value) {
-    errorMsg.value = 'Informe o nome do estabelecimento e a categoria.'
+  const data = ruleForm.validate({ pattern: newPattern.value, tagId: newTagId.value })
+  if (!data) {
+    errorMsg.value = ruleForm.firstError.value
     return
   }
 
@@ -86,12 +97,13 @@ const handleCreateRule = async () => {
 
   try {
     await api.post('/merchant-rules', {
-      pattern: newPattern.value.trim().toUpperCase(),
-      tag_id: newTagId.value,
+      pattern: data.pattern.toUpperCase(),
+      tag_id: data.tagId,
     })
     newPattern.value = ''
     newTagId.value = ''
     isCreateModalOpen.value = false
+    toast.success('Regra criada.', 'Novos lançamentos com esse texto receberão a categoria automaticamente.')
     await fetchRules()
   } catch (err: any) {
     errorMsg.value = err.response?.data?.error || err.response?.data?.message || 'Falha ao salvar regra.'
@@ -128,10 +140,10 @@ const handleDeleteRule = async (id: string) => {
       <div>
         <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
           <PhStorefront :size="26" class="text-accent" weight="duotone" />
-          <span>Regras de Estabelecimentos</span>
+          <span>Regras Automáticas</span>
         </h1>
         <p class="text-white/50 text-xs sm:text-sm mt-1">
-          Memória determinística (Camada 1). Padrões cadastrados aqui têm prioridade absoluta sobre o classificador Naive Bayes.
+          Quando a descrição de um lançamento contém o texto da regra, ele recebe a categoria automaticamente.
         </p>
       </div>
 
@@ -152,41 +164,42 @@ const handleDeleteRule = async (id: string) => {
           <PhShieldCheck :size="22" weight="duotone" />
         </div>
         <div>
-          <h3 class="text-sm font-bold text-white">Hierarquia de Auto-Classificação</h3>
+          <h3 class="text-sm font-bold text-white">Regras vêm antes da IA</h3>
           <p class="text-xs text-white/50 mt-0.5">
-            1º Estabelecimentos Salvos (100% de confiança) &rarr; 2º IA Bayesiana (com margem de corte).
+            Uma regra sempre vence a sugestão da IA. A IA só categoriza o que nenhuma regra cobre.
           </p>
         </div>
       </div>
-      <div class="px-3 py-1.5 rounded-xl bg-white/5 text-white/60 text-xs font-mono border border-white/5">
+      <div class="hidden sm:block px-3 py-1.5 rounded-xl bg-white/5 text-white/60 text-xs font-mono border border-white/5">
         {{ rules.length }} regras cadastradas
       </div>
     </Card>
 
     <!-- Barra de Busca -->
     <div class="relative">
-      <PhMagnifyingGlass :size="18" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 z-10" />
+      <PhMagnifyingGlass :size="18" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/50 z-10" />
       <Input
         v-model="searchQuery"
-        type="text"
-        placeholder="Buscar regra por estabelecimento ou tag..."
-        class="pl-10 pr-4 text-xs sm:text-sm"
+        type="search"
+        aria-label="Buscar regras"
+        placeholder="Buscar por estabelecimento ou categoria..."
+        class="pl-10 pr-4"
       />
     </div>
 
     <!-- Lista de Regras -->
     <Card class="overflow-hidden shadow-md">
-      <div v-if="loading" class="p-12 text-center text-white/40 text-sm">
+      <div v-if="loading" class="p-12 text-center text-white/50 text-sm">
         Carregando regras...
       </div>
 
       <div v-else-if="filteredRules.length === 0" class="p-12 text-center flex flex-col items-center">
-        <div class="w-12 h-12 rounded-2xl bg-white/5 text-white/30 flex items-center justify-center mb-3">
+        <div class="w-12 h-12 rounded-2xl bg-white/5 text-white/50 flex items-center justify-center mb-3">
           <PhListDashes :size="24" />
         </div>
         <p class="text-sm font-semibold text-white/70">Nenhuma regra de estabelecimento encontrada</p>
-        <p class="text-xs text-white/40 mt-1 max-w-sm">
-          Você pode cadastrar regras manualmente acima, ou ao categorizar uma transação e clicar para propagar para similares.
+        <p class="text-xs text-white/50 mt-1 max-w-sm">
+          Crie uma regra em "Nova Regra" ou, ao categorizar um lançamento, escolha "Aplicar a todas" para as transações parecidas.
         </p>
       </div>
 
@@ -204,7 +217,7 @@ const handleDeleteRule = async (id: string) => {
               </span>
             </div>
 
-            <div class="hidden sm:flex items-center text-white/30">
+            <div class="hidden sm:flex items-center text-white/50">
               <PhArrowRight :size="14" />
             </div>
 
@@ -222,7 +235,7 @@ const handleDeleteRule = async (id: string) => {
                 <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: rule.tag.color || '#10b981' }"></span>
                 <span>{{ rule.tag.name }}</span>
               </span>
-              <span v-else class="text-white/40 text-xs italic">Tag não encontrada</span>
+              <span v-else class="text-white/50 text-xs italic">Categoria não encontrada</span>
             </div>
           </div>
 
@@ -230,8 +243,9 @@ const handleDeleteRule = async (id: string) => {
           <button
             type="button"
             @click="handleDeleteRule(rule.id)"
-            class="p-2 text-white/40 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
+            class="p-2.5 text-white/50 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all cursor-pointer"
             title="Excluir regra"
+            aria-label="Excluir regra"
           >
             <PhTrash :size="16" />
           </button>
@@ -260,7 +274,7 @@ const handleDeleteRule = async (id: string) => {
               placeholder="ex: UBER, IFOOD, POSTO SHELL"
               class="uppercase font-mono"
             />
-            <span class="text-[10px] text-white/40 mt-1 block">
+            <span class="text-[10px] text-white/50 mt-1 block">
               Qualquer transação cujo nome contenha esse texto receberá a tag abaixo.
             </span>
           </div>
@@ -275,7 +289,7 @@ const handleDeleteRule = async (id: string) => {
             />
           </div>
 
-          <div v-if="errorMsg" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl">
+          <div v-if="errorMsg" role="alert" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl">
             {{ errorMsg }}
           </div>
 

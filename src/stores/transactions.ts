@@ -43,8 +43,11 @@ export const useTransactionsStore = defineStore('transactions', {
       amount_max: undefined as number | string | undefined,
     },
     loading: false,
+    // Falha no último carregamento: a view mostra erro + "Tentar novamente" em vez de lista vazia
+    loadError: false,
     dashboardTransactions: [] as Transaction[],
     dashboardLoading: false,
+    dashboardLoadError: false,
   }),
 
   actions: {
@@ -61,7 +64,11 @@ export const useTransactionsStore = defineStore('transactions', {
         }
         const { data } = await api.get('/transactions', { params: queryParams });
         this.dashboardTransactions = data.data || [];
+        this.dashboardLoadError = false;
         return this.dashboardTransactions;
+      } catch (err) {
+        this.dashboardLoadError = true;
+        throw err;
       } finally {
         this.dashboardLoading = false;
       }
@@ -110,6 +117,12 @@ export const useTransactionsStore = defineStore('transactions', {
           total: data.total,
           totalPages: data.total_pages,
         };
+        this.loadError = false;
+      } catch (err) {
+        // Não relança: a falha fica visível via loadError (evita "Nenhum lançamento" falso
+        // e evita que applySimilar/runAIAutoTag reportem erro quando só o recarregamento falhou)
+        console.error('Falha ao carregar transações:', err);
+        this.loadError = true;
       } finally {
         this.loading = false;
       }

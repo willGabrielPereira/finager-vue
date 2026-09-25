@@ -5,6 +5,8 @@ import { showAlert, toast } from '../utils/feedback'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useBillingStore } from '../stores/billing'
+import { profileInfoSchema, changePasswordSchema, optionalEmailSchema } from '@/validation/schemas'
+import { useFormValidation } from '@/composables/useFormValidation'
 import { 
   PhUser, 
   PhHouse, 
@@ -25,7 +27,8 @@ import {
   PhCrown, 
   PhLightning, 
   PhRocketLaunch, 
-  PhShieldCheck 
+  PhShieldCheck,
+  PhShareNetwork
 } from '@phosphor-icons/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -90,26 +93,23 @@ onMounted(async () => {
   }
 })
 
+const profileForm = useFormValidation(profileInfoSchema)
+
 const handleSaveProfile = async () => {
   profileError.value = ''
   profileSuccess.value = false
 
-  if (!login.value.trim() || login.value.trim().length < 4) {
-    profileError.value = 'O nome de usuário deve conter no mínimo 4 caracteres.'
-    return
-  }
-
-  const trimmedEmail = email.value.trim().toLowerCase()
-  if (trimmedEmail && (!trimmedEmail.includes('@') || !trimmedEmail.includes('.'))) {
-    profileError.value = 'Por favor, informe um e-mail válido.'
+  const data = profileForm.validate({ login: login.value, email: email.value.toLowerCase() })
+  if (!data) {
+    profileError.value = profileForm.firstError.value
     return
   }
 
   profileLoading.value = true
   try {
     await authStore.updateProfile({
-      login: login.value.trim(),
-      email: trimmedEmail,
+      login: data.login,
+      email: data.email,
       family_name: familyName.value.trim(),
     })
     profileSuccess.value = true
@@ -123,26 +123,25 @@ const handleSaveProfile = async () => {
   }
 }
 
+const passwordForm = useFormValidation(changePasswordSchema)
+
 const handleChangePassword = async () => {
   passwordError.value = ''
   passwordSuccess.value = false
 
-  if (!currentPassword.value || !newPassword.value) {
-    passwordError.value = 'Preencha a senha atual e a nova senha.'
-    return
-  }
-  if (newPassword.value.length < 8) {
-    passwordError.value = 'A nova senha deve possuir pelo menos 8 caracteres.'
-    return
-  }
-  if (newPassword.value !== confirmPassword.value) {
-    passwordError.value = 'A confirmação não confere com a nova senha digitada.'
+  const data = passwordForm.validate({
+    currentPassword: currentPassword.value,
+    newPassword: newPassword.value,
+    confirmPassword: confirmPassword.value,
+  })
+  if (!data) {
+    passwordError.value = passwordForm.firstError.value
     return
   }
 
   passwordLoading.value = true
   try {
-    await authStore.changePassword(currentPassword.value, newPassword.value)
+    await authStore.changePassword(data.currentPassword, data.newPassword)
     passwordSuccess.value = true
     currentPassword.value = ''
     newPassword.value = ''
@@ -165,10 +164,16 @@ const openInviteModal = () => {
 }
 
 const handleCreateInvite = async () => {
-  inviteLoading.value = true
   inviteError.value = ''
+  const emailCheck = optionalEmailSchema.safeParse(inviteTargetEmail.value.trim())
+  if (!emailCheck.success) {
+    inviteError.value = emailCheck.error.issues[0].message
+    return
+  }
+
+  inviteLoading.value = true
   try {
-    const data = await authStore.createInvite(inviteTargetEmail.value.trim() || undefined)
+    const data = await authStore.createInvite(emailCheck.data || undefined)
     const origin = window.location.origin
     const inviteLink = `${origin}/register?invite=${data.token}`
     generatedInvite.value = {
@@ -183,13 +188,27 @@ const handleCreateInvite = async () => {
   }
 }
 
-const copyInviteLink = () => {
-  if (generatedInvite.value?.link) {
-    navigator.clipboard.writeText(generatedInvite.value.link)
+const copyInviteLink = async () => {
+  if (!generatedInvite.value?.link) return
+  try {
+    await navigator.clipboard.writeText(generatedInvite.value.link)
     copiedInvite.value = true
     setTimeout(() => {
       copiedInvite.value = false
     }, 2000)
+  } catch {
+    toast.error('Não foi possível copiar', 'Selecione o link e copie manualmente.')
+  }
+}
+
+// No celular, compartilhar direto no WhatsApp/e-mail é mais natural que copiar
+const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+const shareInviteLink = async () => {
+  if (!generatedInvite.value?.link) return
+  try {
+    await navigator.share({ title: 'Convite Finager', text: 'Entre na nossa família no Finager:', url: generatedInvite.value.link })
+  } catch {
+    // Usuário cancelou o compartilhamento
   }
 }
 
@@ -201,12 +220,21 @@ const handleJoinFamily = async () => {
     return
   }
 
+  const confirmed = await showAlert.confirm({
+    title: 'Entrar em outra família?',
+    text: `Você passará a ver as contas e lançamentos da nova família e deixará de ver os de "${authStore.user?.family_name || 'sua família atual'}".`,
+    confirmText: 'Entrar na nova família',
+    cancelText: 'Cancelar',
+    isDestructive: true,
+  })
+  if (!confirmed) return
+
   joinLoading.value = true
   try {
     const data = await authStore.joinFamily(joinToken.value.trim())
-    joinSuccess.value = data.message || 'Você ingressou na nova família com sucesso!'
-    joinToken.value = ''
-    familyName.value = authStore.user?.family_name || ''
+    toast.success('Você entrou na nova família', data.message)
+    // Recarrega o app inteiro: todas as stores ainda têm dados da família anterior
+    window.location.assign('/')
   } catch (err: any) {
     joinError.value = err.response?.data?.error || err.response?.data?.message || 'Código de convite inválido ou expirado.'
   } finally {
@@ -233,15 +261,6 @@ const handleRemoveMember = async (memberId: string, memberLogin: string) => {
 }
 
 const handleLogout = async () => {
-  const confirmed = await showAlert.confirm({
-    title: 'Deseja realmente sair?',
-    text: 'Você precisará fazer login novamente para acessar suas finanças.',
-    confirmText: 'Sair da conta',
-    cancelText: 'Permanecer',
-    isDestructive: false,
-  })
-  if (!confirmed) return
-
   await authStore.logout()
   router.push('/login')
 }
@@ -368,7 +387,7 @@ const formatDate = (dateStr?: string) => {
           <PhUsers :size="20" class="text-accent" weight="duotone" />
           <h3 class="text-sm font-bold text-white flex items-center gap-2">
             <span>Membros da Família Compartilhada</span>
-            <span class="text-xs text-white/40 font-normal">({{ billingStore.membersUsed }}/{{ billingStore.isMembersUnlimited ? '∞' : billingStore.membersLimit }})</span>
+            <span class="text-xs text-white/50 font-normal">({{ billingStore.membersUsed }}/{{ billingStore.isMembersUnlimited ? '∞' : billingStore.membersLimit }})</span>
           </h3>
         </div>
 
@@ -382,7 +401,7 @@ const formatDate = (dateStr?: string) => {
         </Button>
       </div>
 
-      <div v-if="authStore.familyMembers.length === 0" class="p-4 text-center text-xs text-white/40">
+      <div v-if="authStore.familyMembers.length === 0" class="p-4 text-center text-xs text-white/50">
         Nenhum membro listado.
       </div>
 
@@ -401,7 +420,7 @@ const formatDate = (dateStr?: string) => {
                 <span>{{ m.login }}</span>
                 <span v-if="m.user_id === authStore.user?.user_id" class="text-[10px] bg-accent/20 text-accent px-1.5 py-0.2 rounded font-normal">você</span>
               </p>
-              <p class="text-[11px] text-white/40 truncate max-w-[180px]">{{ m.email || 'Sem e-mail' }}</p>
+              <p class="text-[11px] text-white/50 truncate max-w-[180px]">{{ m.email || 'Sem e-mail' }}</p>
             </div>
           </div>
 
@@ -421,8 +440,8 @@ const formatDate = (dateStr?: string) => {
       <!-- Ingressar em Outra Família via Código -->
       <div class="mt-2 pt-4 border-t border-white/5 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
         <div class="flex-1">
-          <label class="text-xs text-white/70 block mb-1">Recebeu um convite? Cole o código ou abra o link:</label>
-          <Input
+          <label for="profile-join-token" class="text-xs text-white/70 block mb-1">Recebeu um convite? Cole o código ou abra o link:</label>
+          <Input id="profile-join-token"
             v-model="joinToken"
             type="text"
             placeholder="Cole o código do convite aqui..."
@@ -454,16 +473,16 @@ const formatDate = (dateStr?: string) => {
 
         <form @submit.prevent="handleSaveProfile" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome de Usuário (Login)</label>
-            <Input
+            <label for="profile-login" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome de Usuário (Login)</label>
+            <Input id="profile-login"
               v-model="login"
               type="text"
             />
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">E-mail Cadastrado</label>
-            <Input
+            <label for="profile-email" class="text-xs font-semibold text-white/80 mb-1.5 block">E-mail Cadastrado</label>
+            <Input id="profile-email"
               v-model="email"
               type="email"
               placeholder="ex: usuario@email.com"
@@ -471,8 +490,8 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da Família / Espaço</label>
-            <Input
+            <label for="profile-family" class="text-xs font-semibold text-white/80 mb-1.5 block">Nome da Família / Espaço</label>
+            <Input id="profile-family"
               v-model="familyName"
               type="text"
               placeholder="ex: Família Pereira"
@@ -510,8 +529,8 @@ const formatDate = (dateStr?: string) => {
 
         <form @submit.prevent="handleChangePassword" class="flex flex-col gap-4">
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual</label>
-            <Input
+            <label for="profile-current-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual</label>
+            <Input id="profile-current-password"
               v-model="currentPassword"
               type="password"
               placeholder="••••••••"
@@ -519,8 +538,8 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Nova Senha (mínimo 8 caracteres)</label>
-            <Input
+            <label for="profile-new-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Nova Senha (mínimo 8 caracteres)</label>
+            <Input id="profile-new-password"
               v-model="newPassword"
               type="password"
               placeholder="••••••••"
@@ -528,8 +547,8 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Confirmar Nova Senha</label>
-            <Input
+            <label for="profile-confirm-password" class="text-xs font-semibold text-white/80 mb-1.5 block">Confirmar Nova Senha</label>
+            <Input id="profile-confirm-password"
               v-model="confirmPassword"
               type="password"
               placeholder="••••••••"
@@ -599,16 +618,16 @@ const formatDate = (dateStr?: string) => {
           </p>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
+            <label for="invite-email" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
               <PhEnvelopeSimple :size="14" class="text-accent" />
               <span>E-mail do Convidado (Recomendado para Segurança)</span>
             </label>
-            <Input
+            <Input id="invite-email"
               v-model="inviteTargetEmail"
               type="email"
               placeholder="ex: parceiro@email.com (opcional)"
             />
-            <p class="text-[11px] text-white/40 mt-1">
+            <p class="text-[11px] text-white/50 mt-1">
               Se informado, apenas uma conta com este e-mail poderá aceitar o convite, impedindo qualquer entrada indevida.
             </p>
           </div>
@@ -635,7 +654,7 @@ const formatDate = (dateStr?: string) => {
               class="gap-1.5 font-bold shadow-lg shadow-accent/20"
             >
               <PhShieldCheck :size="15" weight="bold" />
-              <span>{{ inviteLoading ? 'Gerando Link...' : 'Gerar Convite Criptografado' }}</span>
+              <span>{{ inviteLoading ? 'Gerando link...' : 'Gerar link de convite' }}</span>
             </Button>
           </div>
         </div>
@@ -647,13 +666,25 @@ const formatDate = (dateStr?: string) => {
           </div>
 
           <div>
-            <label class="text-xs font-semibold text-white/80 mb-1.5 block">Link de Cadastro Direto:</label>
-            <div class="flex items-center gap-2">
+            <label for="invite-link" class="text-xs font-semibold text-white/80 mb-1.5 block">Link de convite</label>
+            <div class="flex flex-wrap items-center gap-2">
               <Input
+                id="invite-link"
                 :value="generatedInvite.link"
                 readonly
-                class="flex-1 font-mono text-xs truncate"
+                class="flex-1 min-w-0 font-mono text-xs truncate"
               />
+              <Button
+                v-if="canShare"
+                type="button"
+                size="sm"
+                variant="outline"
+                @click="shareInviteLink"
+                class="gap-1.5"
+              >
+                <PhShareNetwork :size="14" weight="bold" />
+                <span>Compartilhar</span>
+              </Button>
               <Button
                 type="button"
                 size="sm"

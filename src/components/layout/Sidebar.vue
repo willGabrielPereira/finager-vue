@@ -12,7 +12,8 @@ import {
   PhFileText,
   PhSparkle,
   PhCrown,
-  PhLightning
+  PhLightning,
+  PhListChecks
 } from '@phosphor-icons/vue'
 import { useRoute } from 'vue-router'
 import { useBillingStore } from '../../stores/billing'
@@ -37,8 +38,8 @@ const navItems = [
   { name: 'Dashboard', path: '/', icon: PhSquaresFour, tour: 'nav-dashboard' },
   { name: 'Transações', path: '/transactions', icon: PhListDashes, tour: 'nav-transactions' },
   { name: 'Contas Bancárias', path: '/accounts', icon: PhBank, tour: 'nav-accounts' },
-  { name: 'Importar OFX', path: '/import', icon: PhUploadSimple, tour: 'nav-import' },
-  { name: 'Categorias & Tags', path: '/tags', icon: PhTag, tour: 'nav-tags' },
+  { name: 'Categorias', path: '/tags', icon: PhTag, tour: 'nav-tags' },
+  { name: 'Regras Automáticas', path: '/tag-rules', icon: PhListChecks, tour: 'nav-tag-rules' },
   { name: 'Plano & Cobrança', path: '/billing', icon: PhCrown, tour: 'nav-billing' },
   { name: 'Meu Perfil', path: '/profile', icon: PhUser, tour: 'nav-profile' },
 ]
@@ -58,7 +59,7 @@ const navItems = [
       </div>
     </div>
 
-    <!-- Ação Rápida no Desktop -->
+    <!-- Ações Rápidas no Desktop -->
     <div class="p-4 border-b border-white/5 flex flex-col gap-2">
       <button
         type="button"
@@ -69,6 +70,15 @@ const navItems = [
         <PhPlus :size="16" weight="bold" />
         <span>Novo Lançamento</span>
       </button>
+      <button
+        type="button"
+        @click="$emit('import-ofx')"
+        data-tour="sidebar-import-btn"
+        class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-white font-semibold text-xs hover:bg-white/10 transition-all cursor-pointer"
+      >
+        <PhUploadSimple :size="16" />
+        <span>Importar OFX</span>
+      </button>
     </div>
 
     <!-- Navegação Principal -->
@@ -78,6 +88,7 @@ const navItems = [
         :key="item.path"
         :to="item.path"
         :data-tour="item.tour"
+        :aria-current="route.path === item.path ? 'page' : undefined"
         class="flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs transition-all duration-150 font-medium"
         :class="route.path === item.path 
           ? 'bg-accent/15 text-accent font-semibold shadow-sm' 
@@ -126,7 +137,7 @@ const navItems = [
         </div>
 
         <div v-if="!billingStore.isPro" class="space-y-1">
-          <div class="flex items-center justify-between text-[10px] text-white/40">
+          <div class="flex items-center justify-between text-[10px] text-white/50">
             <span>Contas conectadas</span>
             <span :class="billingStore.isAccountsLimitReached ? 'text-rose-400 font-bold' : ''">
               {{ billingStore.accountsUsed }}/{{ billingStore.accountsLimit }}
@@ -140,7 +151,7 @@ const navItems = [
             ></div>
           </div>
         </div>
-        <div v-else class="text-[10px] text-white/40 flex items-center justify-between">
+        <div v-else class="text-[10px] text-white/50 flex items-center justify-between">
           <span>Recursos ilimitados</span>
           <span class="text-emerald-400 font-medium">100%</span>
         </div>

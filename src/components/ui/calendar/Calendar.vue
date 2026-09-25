@@ -60,7 +60,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits)
           <CalendarHeadCell
             v-for="day in weekDays"
             :key="day"
-            class="flex-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white/40 pb-2"
+            class="flex-1 text-center text-[10px] font-semibold uppercase tracking-wide text-white/50 pb-2"
           >
             {{ day }}
           </CalendarHeadCell>

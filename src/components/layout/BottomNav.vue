@@ -1,48 +1,52 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { 
-  PhSquaresFour, 
-  PhListDashes, 
-  PhPlus, 
-  PhTag, 
-  PhUser
+import {
+  PhSquaresFour,
+  PhListDashes,
+  PhPlus,
+  PhTag,
+  PhDotsThreeOutline
 } from '@phosphor-icons/vue'
 
 defineEmits<{
   (e: 'open-action-menu'): void
+  (e: 'open-more-menu'): void
 }>()
 
 const route = useRoute()
 
-const navItems = [
+// Frequência de uso: Início/Transações (diário), "+" (lançar/importar), Categorias (periódico).
+// Telas raras (Perfil, Contas, Regras, Plano) ficam em "Mais".
+const leftItems = [
   { name: 'Início', path: '/', icon: PhSquaresFour },
-  { name: 'Extrato', path: '/transactions', icon: PhListDashes },
-  { name: 'Tags', path: '/tags', icon: PhTag },
-  { name: 'Perfil', path: '/profile', icon: PhUser },
+  { name: 'Transações', path: '/transactions', icon: PhListDashes, tour: 'bottom-nav-transactions' },
 ]
+
+const morePaths = ['/profile', '/accounts', '/tag-rules', '/billing']
+const isMoreActive = computed(() => morePaths.includes(route.path))
+
+const itemClass = (active: boolean) =>
+  active ? 'text-accent font-semibold' : 'text-white/60 hover:text-white'
 </script>
 
 <template>
-  <nav class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-xl border-t border-white/10 px-3 py-1.5 flex items-center justify-around safe-area-pb">
-    <!-- Item 1: Início -->
+  <nav
+    aria-label="Navegação principal"
+    class="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-slate-950/95 backdrop-blur-xl border-t border-white/10 px-2 pt-1.5 flex items-center justify-around"
+    style="padding-bottom: max(0.375rem, env(safe-area-inset-bottom))"
+  >
     <router-link
-      :to="navItems[0].path"
-      class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
-      :class="route.path === navItems[0].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
+      v-for="item in leftItems"
+      :key="item.path"
+      :to="item.path"
+      :data-tour="item.tour"
+      :aria-current="route.path === item.path ? 'page' : undefined"
+      class="flex flex-col items-center gap-1 py-1.5 min-w-[64px] rounded-xl transition-all"
+      :class="itemClass(route.path === item.path)"
     >
-      <component :is="navItems[0].icon" :size="20" :weight="route.path === navItems[0].path ? 'fill' : 'regular'" />
-      <span class="text-[10px]">{{ navItems[0].name }}</span>
-    </router-link>
-
-    <!-- Item 2: Extrato -->
-    <router-link
-      :to="navItems[1].path"
-      data-tour="bottom-nav-transactions"
-      class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
-      :class="route.path === navItems[1].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
-    >
-      <component :is="navItems[1].icon" :size="20" :weight="route.path === navItems[1].path ? 'fill' : 'regular'" />
-      <span class="text-[10px]">{{ navItems[1].name }}</span>
+      <component :is="item.icon" :size="22" :weight="route.path === item.path ? 'fill' : 'regular'" />
+      <span class="text-[11px]">{{ item.name }}</span>
     </router-link>
 
     <!-- Botão Central Flutuante (+) -->
@@ -50,31 +54,31 @@ const navItems = [
       type="button"
       @click="$emit('open-action-menu')"
       data-tour="mobile-action-btn"
-      class="w-12 h-12 -mt-5 rounded-full bg-accent text-bg shadow-lg shadow-accent/25 flex items-center justify-center cursor-pointer hover:scale-105 active:scale-95 transition-transform"
-      title="Ações Rápidas"
+      class="w-14 h-14 -mt-6 rounded-full bg-accent text-bg shadow-lg shadow-accent/25 flex items-center justify-center cursor-pointer active:scale-95 transition-transform"
+      aria-label="Novo lançamento ou importar"
     >
-      <PhPlus :size="24" weight="bold" />
+      <PhPlus :size="26" weight="bold" />
     </button>
 
-    <!-- Item 3: Tags -->
     <router-link
-      :to="navItems[2].path"
-      class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
-      :class="route.path === navItems[2].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
+      to="/tags"
+      :aria-current="route.path === '/tags' ? 'page' : undefined"
+      class="flex flex-col items-center gap-1 py-1.5 min-w-[64px] rounded-xl transition-all"
+      :class="itemClass(route.path === '/tags')"
     >
-      <component :is="navItems[2].icon" :size="20" :weight="route.path === navItems[2].path ? 'fill' : 'regular'" />
-      <span class="text-[10px]">{{ navItems[2].name }}</span>
+      <PhTag :size="22" :weight="route.path === '/tags' ? 'fill' : 'regular'" />
+      <span class="text-[11px]">Categorias</span>
     </router-link>
 
-    <!-- Item 4: Perfil -->
-    <router-link
-      :to="navItems[3].path"
-      data-tour="bottom-nav-profile"
-      class="flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all"
-      :class="route.path === navItems[3].path ? 'text-accent font-semibold' : 'text-white/50 hover:text-white'"
+    <button
+      type="button"
+      @click="$emit('open-more-menu')"
+      data-tour="bottom-nav-more"
+      class="flex flex-col items-center gap-1 py-1.5 min-w-[64px] rounded-xl transition-all cursor-pointer"
+      :class="itemClass(isMoreActive)"
     >
-      <component :is="navItems[3].icon" :size="20" :weight="route.path === navItems[3].path ? 'fill' : 'regular'" />
-      <span class="text-[10px]">{{ navItems[3].name }}</span>
-    </router-link>
+      <PhDotsThreeOutline :size="22" :weight="isMoreActive ? 'fill' : 'regular'" />
+      <span class="text-[11px]">Mais</span>
+    </button>
   </nav>
 </template>

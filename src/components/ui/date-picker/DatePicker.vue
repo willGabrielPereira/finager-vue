@@ -64,8 +64,8 @@ const onSelect = (val: DateValue | undefined) => {
           )
         "
       >
-        <PhCalendarBlank :size="16" class="text-white/40 shrink-0" />
-        <span :class="calendarValue ? 'text-white font-medium' : 'text-white/40'">{{ displayLabel }}</span>
+        <PhCalendarBlank :size="16" class="text-white/50 shrink-0" />
+        <span :class="calendarValue ? 'text-white font-medium' : 'text-white/50'">{{ displayLabel }}</span>
       </button>
     </PopoverTrigger>
 

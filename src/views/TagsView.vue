@@ -2,6 +2,7 @@
 import { ref, onMounted, computed } from 'vue'
 import { useTagsStore, type Tag } from '../stores/tags'
 import { toast, showAlert } from '../utils/feedback'
+import { minLengthText } from '@/validation/schemas'
 import { 
   PhTag, 
   PhPlus, 
@@ -10,7 +11,8 @@ import {
   PhLock,
   PhCheck, 
   PhCircleNotch,
-  PhMagnifyingGlass 
+  PhMagnifyingGlass,
+  PhWarningCircle
 } from '@phosphor-icons/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -71,11 +73,12 @@ const openEditModal = (tag: Tag) => {
 }
 
 const handleSubmit = async () => {
-  const name = formTagName.value.trim()
-  if (!name || name.length < 2) {
-    formError.value = 'O nome da categoria deve ter pelo menos 2 caracteres.'
+  const nameCheck = minLengthText(2, 'O nome da categoria deve ter pelo menos 2 caracteres.').safeParse(formTagName.value)
+  if (!nameCheck.success) {
+    formError.value = nameCheck.error.issues[0].message
     return
   }
+  const name = nameCheck.data
 
   saving.value = true
   formError.value = ''
@@ -87,12 +90,14 @@ const handleSubmit = async () => {
         color: formTagColor.value,
         icon: 'tag'
       })
+      toast.success('Categoria criada.')
     } else if (editingTagId.value) {
       await tagsStore.updateTag(editingTagId.value, {
         name,
         color: formTagColor.value,
         icon: 'tag'
       })
+      toast.success('Categoria atualizada.')
     }
     isModalOpen.value = false
   } catch (err: any) {
@@ -105,13 +110,15 @@ const handleSubmit = async () => {
 
 const handleDelete = async (tag: Tag) => {
   if (tag.is_system) {
-    toast.warning('Ação não permitida', 'Tags de sistema são fixas e não podem ser removidas.')
+    toast.warning('Ação não permitida', 'Categorias do sistema são fixas e não podem ser removidas.')
     return
   }
 
   const confirmed = await showAlert.confirm({
-    title: `Excluir a tag "${tag.name}"?`,
-    text: 'Esta tag será removida das categorias personalizadas.',
+    // Nome digitado pelo usuário: o SweetAlert2 renderiza `title` como HTML (não escapa),
+    // então nunca interpole dado de usuário ali — só em `text`, que vai como texto puro.
+    title: 'Excluir categoria?',
+    text: `A categoria "${tag.name}": as transações com ela ficarão sem categoria e as regras automáticas ligadas a ela serão apagadas.`,
     confirmText: 'Sim, excluir',
     cancelText: 'Cancelar',
     isDestructive: true,
@@ -121,10 +128,10 @@ const handleDelete = async (tag: Tag) => {
   deletingTagId.value = tag.id
   try {
     await tagsStore.deleteTag(tag.id)
-    toast.success('Tag excluída com sucesso.')
+    toast.success('Categoria excluída.')
   } catch (err) {
     console.error('Falha ao excluir tag:', err)
-    toast.error('Erro ao excluir', 'Não foi possível excluir a tag.')
+    toast.error('Erro ao excluir', 'Não foi possível excluir a categoria.')
   } finally {
     deletingTagId.value = null
   }
@@ -136,8 +143,8 @@ const handleDelete = async (tag: Tag) => {
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-3">
       <div>
-        <h1 class="text-xl md:text-2xl font-bold tracking-tight">Categorias & Tags</h1>
-        <p class="text-xs text-white/50">Gerencie as categorias do sistema e os marcadores personalizados da família</p>
+        <h1 class="text-xl md:text-2xl font-bold tracking-tight">Categorias</h1>
+        <p class="text-xs text-white/50">Categorias do sistema e as criadas pela sua família</p>
       </div>
 
       <div class="flex items-center gap-3">
@@ -155,21 +162,38 @@ const handleDelete = async (tag: Tag) => {
     <!-- Barra de Pesquisa -->
     <Card class="p-3 flex items-center justify-between gap-4">
       <div class="relative w-full max-w-sm">
-        <PhMagnifyingGlass class="absolute left-3 top-2.5 text-white/40 z-10" :size="16" />
+        <PhMagnifyingGlass class="absolute left-3 top-1/2 -translate-y-1/2 text-white/50 z-10" :size="16" />
         <Input
           v-model="searchQuery"
-          type="text"
-          placeholder="Buscar categorias cadastradas..."
-          class="pl-9 pr-3 text-xs"
+          type="search"
+          aria-label="Buscar categorias"
+          placeholder="Buscar categorias..."
+          class="pl-9 pr-3"
         />
       </div>
-      <div class="text-xs text-white/40 shrink-0">
+      <div class="hidden sm:block text-xs text-white/50 shrink-0">
         Total: <span class="text-white font-bold">{{ filteredTags.length }}</span> categorias
       </div>
     </Card>
 
+    <div v-if="tagsStore.loading && tagsStore.tags.length === 0" class="p-12 text-center text-white/50 flex flex-col items-center gap-3">
+      <PhCircleNotch class="animate-spin text-accent" :size="28" />
+      <span class="text-xs">Carregando categorias...</span>
+    </div>
+
+    <Card v-else-if="tagsStore.loadError" class="p-8 text-center flex flex-col items-center gap-3" role="alert">
+      <PhWarningCircle :size="28" class="text-rose-400" weight="duotone" />
+      <p class="text-sm font-semibold text-white">Não foi possível carregar as categorias</p>
+      <Button size="sm" variant="outline" @click="tagsStore.fetchTags()">Tentar novamente</Button>
+    </Card>
+
+    <div v-else-if="filteredTags.length === 0 && searchQuery" class="p-10 text-center text-xs text-white/50 flex flex-col items-center gap-2">
+      <span>Nenhuma categoria encontrada para "{{ searchQuery }}".</span>
+      <button type="button" class="px-3 py-2 text-accent hover:underline cursor-pointer" @click="searchQuery = ''">Limpar busca</button>
+    </div>
+
     <!-- Grid de Tags -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+    <div v-else class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
       <Card
         v-for="tag in filteredTags"
         :key="tag.id"
@@ -186,8 +210,8 @@ const handleDelete = async (tag: Tag) => {
           </div>
           <div class="min-w-0">
             <h4 class="text-sm font-bold text-white truncate">{{ tag.name }}</h4>
-            <span class="text-[10px] text-white/40 font-medium">
-              {{ tag.is_system ? 'Padrão do Sistema' : 'Customizada da Família' }}
+            <span class="text-[11px] text-white/50 font-medium">
+              {{ tag.is_system ? 'Padrão do sistema' : 'Criada pela família' }}
             </span>
           </div>
         </div>
@@ -208,8 +232,9 @@ const handleDelete = async (tag: Tag) => {
             <button
               type="button"
               @click="openEditModal(tag)"
-              class="p-2 rounded-lg text-white/40 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+              class="p-2.5 rounded-lg text-white/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
               title="Editar categoria"
+              aria-label="Editar categoria"
             >
               <PhPencilSimple :size="16" />
             </button>
@@ -217,8 +242,9 @@ const handleDelete = async (tag: Tag) => {
               type="button"
               @click="handleDelete(tag)"
               :disabled="deletingTagId === tag.id"
-              class="p-2 rounded-lg text-white/40 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
+              class="p-2.5 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
               title="Excluir categoria"
+              aria-label="Excluir categoria"
             >
               <PhCircleNotch v-if="deletingTagId === tag.id" :size="16" class="animate-spin" />
               <PhTrash v-else :size="16" />
@@ -252,7 +278,7 @@ const handleDelete = async (tag: Tag) => {
             <span class="text-xs font-bold text-white truncate block">
               {{ formTagName.trim() || 'Nome da Categoria' }}
             </span>
-            <span class="text-[10px] text-white/40 font-medium">Pré-visualização</span>
+            <span class="text-[10px] text-white/50 font-medium">Pré-visualização</span>
           </div>
         </div>
 
@@ -261,8 +287,9 @@ const handleDelete = async (tag: Tag) => {
         </div>
 
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-white/70">Nome da Categoria</label>
+          <label for="tag-form-name" class="text-xs font-semibold text-white/70">Nome da Categoria</label>
           <Input
+            id="tag-form-name"
             v-model="formTagName"
             type="text"
             placeholder="Ex: Assinaturas, Hobbies..."
@@ -278,7 +305,9 @@ const handleDelete = async (tag: Tag) => {
               :key="color"
               type="button"
               @click="formTagColor = color"
-              class="w-6 h-6 rounded-full flex items-center justify-center transition-transform hover:scale-110 cursor-pointer relative"
+              :aria-label="`Cor ${color}`"
+              :aria-pressed="formTagColor === color"
+              class="w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-110 cursor-pointer relative"
               :style="{ backgroundColor: color }"
             >
               <PhCheck v-if="formTagColor === color" :size="14" class="text-white" weight="bold" />
@@ -286,7 +315,7 @@ const handleDelete = async (tag: Tag) => {
 
             <!-- Seletor de Cor Customizada -->
             <label 
-              class="w-6 h-6 rounded-full flex items-center justify-center cursor-pointer border border-dashed border-white/30 hover:border-white/60 transition-colors overflow-hidden relative"
+              class="w-8 h-8 rounded-full flex items-center justify-center cursor-pointer border border-dashed border-white/30 hover:border-white/60 transition-colors overflow-hidden relative"
               title="Escolher cor personalizada"
             >
               <input

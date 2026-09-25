@@ -32,7 +32,9 @@ import {
   PhX, 
   PhCheck, 
   PhArrowsCounterClockwise,
-  PhPencilSimple
+  PhPencilSimple,
+  PhFunnel,
+  PhWarningCircle
 } from '@phosphor-icons/vue'
 
 const authStore = useAuthStore()
@@ -219,6 +221,25 @@ const setFilterTab = (tab: 'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED') 
   store.fetchTransactions()
 }
 
+// Filtros avançados (contas, categorias, período) ficam recolhidos no mobile
+const showAdvancedFilters = ref(false)
+const advancedFilterCount = computed(() =>
+  store.filters.accounts.length +
+  store.filters.tags.length +
+  (store.filters.date_from || store.filters.date_to ? 1 : 0)
+)
+
+// Mudou filtro => volta à página 1 (senão uma página alta pode vir vazia)
+const onFilterSelectChange = () => {
+  store.pagination.page = 1
+  store.fetchTransactions()
+}
+
+const goToPage = async (page: number) => {
+  await store.fetchTransactions({ page })
+  document.querySelector('main')?.scrollTo({ top: 0 })
+}
+
 // Filtro Multi-Contas
 const toggleAccountFilter = (accId: string) => {
   const current = [...store.filters.accounts]
@@ -343,10 +364,9 @@ const getAccountById = (id: string) => {
 }
 
 const onCategorySelected = async (txId: string, tagId: string | null) => {
-  updatingTxId.value = txId
-
   const tx = store.transactions.find((t) => t.id === txId)
   if (!tx) return
+  updatingTxId.value = txId
 
   const originalTags = [...(tx.tags || [])]
   const newTags = tagId ? [tagId, ...originalTags.slice(1)] : []
@@ -366,6 +386,7 @@ const onCategorySelected = async (txId: string, tagId: string | null) => {
     }
   } catch (err) {
     console.error('Erro ao atualizar categoria:', err)
+    toast.error('Categoria não salva', 'Não foi possível salvar a alteração. Tente novamente.')
   } finally {
     updatingTxId.value = null
   }
@@ -383,6 +404,7 @@ const onSecondaryTagToggled = async (txId: string, tagId: string) => {
     await store.updateTags(txId, newTags)
   } catch (err) {
     console.error('Erro ao atualizar marcadores secundários:', err)
+    toast.error('Categoria não salva', 'Não foi possível salvar a alteração. Tente novamente.')
   }
 }
 
@@ -469,7 +491,7 @@ const isCredit = (t: Transaction) => {
         <p class="text-xs text-white/50">Gerencie seus lançamentos bancários, manuais e faturas</p>
       </div>
 
-      <div class="flex items-center gap-2 shrink-0 flex-nowrap overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 no-scrollbar">
+      <div class="flex items-center gap-2 shrink-0 flex-wrap">
         <Button 
           variant="outline"
           size="sm"
@@ -480,11 +502,12 @@ const isCredit = (t: Transaction) => {
           <span>Classificar com IA</span>
         </Button>
 
-        <Button 
+        <!-- No mobile, importar fica no botão "+" da barra inferior -->
+        <Button
           variant="outline"
           size="sm"
-          class="gap-1.5"
-          @click="isImportModalOpen = true" 
+          class="gap-1.5 hidden sm:inline-flex"
+          @click="isImportModalOpen = true"
         >
           <PhUploadSimple :size="15" />
           <span>Importar OFX</span>
@@ -534,7 +557,7 @@ const isCredit = (t: Transaction) => {
             <button
               type="button"
               @click="setFilterTab('ALL')"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
               :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
             >
               Todas
@@ -542,7 +565,7 @@ const isCredit = (t: Transaction) => {
             <button
               type="button"
               @click="setFilterTab('DEBIT')"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
               :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
             >
               Despesas
@@ -550,7 +573,7 @@ const isCredit = (t: Transaction) => {
             <button
               type="button"
               @click="setFilterTab('CREDIT')"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
               :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
             >
               Receitas
@@ -558,7 +581,7 @@ const isCredit = (t: Transaction) => {
             <button
               type="button"
               @click="setFilterTab('UNTAGGED')"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
               :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
             >
               Sem Categoria
@@ -566,7 +589,7 @@ const isCredit = (t: Transaction) => {
             <button
               type="button"
               @click="setFilterTab('PLANNED')"
-              class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
+              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
               :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
             >
               Previstas
@@ -584,56 +607,73 @@ const isCredit = (t: Transaction) => {
             v-if="canScrollRight"
             type="button"
             @click="scrollChips('right')"
-            class="absolute right-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0 animate-pulse hover:animate-none"
+            class="absolute right-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0 animate-pulse hover:animate-none motion-reduce:animate-none"
             title="Mais opções à direita"
           >
             <PhCaretRight :size="13" weight="bold" />
           </button>
         </div>
 
-        <!-- Campo de Busca -->
-        <div class="relative w-full md:w-72 shrink-0">
-          <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/40" />
-          <input
-            v-model="searchInput"
-            type="text"
-            placeholder="Buscar por descrição ou memo..."
-            class="w-full bg-slate-950/70 border border-white/10 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent focus:bg-slate-950 transition-colors"
-          />
-          <button 
-            v-if="searchInput" 
-            @click="searchInput = ''"
+        <!-- Campo de Busca + botão de filtros (mobile) -->
+        <div class="flex items-center gap-2 w-full md:w-72 shrink-0">
+          <div class="relative flex-1 min-w-0">
+            <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
+            <input
+              v-model="searchInput"
+              type="search"
+              aria-label="Buscar lançamentos"
+              placeholder="Buscar por descrição ou observação..."
+              class="w-full bg-slate-950/70 border border-white/10 rounded-xl pl-9 pr-9 py-2 text-base md:text-xs text-white placeholder-white/40 focus:outline-none focus:border-accent focus:bg-slate-950 transition-colors"
+            />
+            <button
+              v-if="searchInput"
+              @click="searchInput = ''"
+              type="button"
+              aria-label="Limpar busca"
+              class="absolute right-1 top-1/2 -translate-y-1/2 p-2 text-white/50 hover:text-white cursor-pointer"
+            >
+              <PhX :size="14" />
+            </button>
+          </div>
+          <button
             type="button"
-            class="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white cursor-pointer"
+            @click="showAdvancedFilters = !showAdvancedFilters"
+            :aria-expanded="showAdvancedFilters"
+            class="md:hidden flex items-center gap-1.5 px-3 h-10 rounded-xl text-xs font-semibold border transition-colors cursor-pointer shrink-0"
+            :class="advancedFilterCount > 0 || showAdvancedFilters ? 'bg-accent/15 border-accent/50 text-accent' : 'bg-white/5 border-white/10 text-white/70'"
           >
-            <PhX :size="14" />
+            <PhFunnel :size="16" />
+            <span>Filtros{{ advancedFilterCount > 0 ? ` (${advancedFilterCount})` : '' }}</span>
           </button>
         </div>
       </div>
 
       <!-- Linha 2: Dropdowns de Filtros Avançados (Contas, Categorias, Período, Limpar) -->
-      <div class="flex items-center gap-2 flex-wrap pt-1 border-t border-white/5">
+      <div
+        class="items-center gap-2 flex-wrap pt-1 border-t border-white/5"
+        :class="showAdvancedFilters ? 'flex' : 'hidden md:flex'"
+      >
         <!-- 1. Dropdown Multi-Contas com AppSelect -->
-        <div class="w-48 sm:w-56 shrink-0">
+        <div class="w-full sm:w-56 shrink-0">
           <AppSelect
             v-model="store.filters.accounts"
             :options="accountFilterOptions"
             mode="multiple"
             placeholder="Todas as Contas"
             size="sm"
-            @change="store.fetchTransactions"
+            @change="onFilterSelectChange"
           />
         </div>
 
         <!-- 2. Dropdown Multi-Categorias com AppSelect -->
-        <div class="w-48 sm:w-56 shrink-0">
+        <div class="w-full sm:w-56 shrink-0">
           <AppSelect
             v-model="store.filters.tags"
             :options="tagFilterOptions"
             mode="multiple"
             placeholder="Todas as Categorias"
             size="sm"
-            @change="store.fetchTransactions"
+            @change="onFilterSelectChange"
           />
         </div>
 
@@ -694,7 +734,7 @@ const isCredit = (t: Transaction) => {
                   <input
                     v-model="customDateFrom"
                     type="date"
-                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-base md:text-xs text-white focus:outline-none focus:border-accent"
                   />
                 </div>
                 <div class="flex-1">
@@ -702,7 +742,7 @@ const isCredit = (t: Transaction) => {
                   <input
                     v-model="customDateTo"
                     type="date"
-                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-accent"
+                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-base md:text-xs text-white focus:outline-none focus:border-accent"
                   />
                 </div>
               </div>
@@ -731,7 +771,7 @@ const isCredit = (t: Transaction) => {
 
       <!-- Badges de Filtros Ativos -->
       <div v-if="hasActiveFilters" class="flex items-center gap-1.5 flex-wrap pt-1 text-[11px]">
-        <span class="text-white/40 text-[10px]">Filtros ativos:</span>
+        <span class="text-white/50 text-[11px]">Filtros ativos:</span>
 
         <!-- Badge Busca -->
         <span 
@@ -739,7 +779,7 @@ const isCredit = (t: Transaction) => {
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-white/80"
         >
           Busca: "{{ searchInput }}"
-          <button @click="searchInput = ''" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+          <button @click="searchInput = ''" aria-label="Remover busca" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
 
         <!-- Badges de Contas Selecionadas -->
@@ -749,7 +789,7 @@ const isCredit = (t: Transaction) => {
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-accent/10 border border-accent/30 text-accent"
         >
           {{ getAccountById(accId)?.name || 'Conta' }}
-          <button @click="toggleAccountFilter(accId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+          <button @click="toggleAccountFilter(accId)" aria-label="Remover filtro de conta" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
 
         <!-- Badges de Categorias Selecionadas -->
@@ -760,7 +800,7 @@ const isCredit = (t: Transaction) => {
         >
           <span class="w-1.5 h-1.5 rounded-full" :style="{ backgroundColor: getTagById(tagId)?.color || '#10b981' }"></span>
           {{ getTagById(tagId)?.name || 'Categoria' }}
-          <button @click="toggleTagFilter(tagId)" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+          <button @click="toggleTagFilter(tagId)" aria-label="Remover filtro de categoria" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
 
         <!-- Badge de Período -->
@@ -769,7 +809,7 @@ const isCredit = (t: Transaction) => {
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300"
         >
           Período: {{ formatDate(store.filters.date_from) }} - {{ formatDate(store.filters.date_to) }}
-          <button @click="setPeriodPreset('ALL')" class="hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+          <button @click="setPeriodPreset('ALL')" aria-label="Remover filtro de período" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
       </div>
     </div>
@@ -781,18 +821,35 @@ const isCredit = (t: Transaction) => {
         <span class="text-xs font-medium">Carregando extrato...</span>
       </div>
 
+      <div v-else-if="store.loadError" class="p-12 text-center flex flex-col items-center gap-3" role="alert">
+        <PhWarningCircle :size="32" class="text-rose-400" weight="duotone" />
+        <span class="text-base font-semibold text-white/80">Não foi possível carregar os lançamentos</span>
+        <span class="text-xs text-white/50">Verifique sua conexão e tente novamente.</span>
+        <Button size="sm" variant="outline" @click="store.fetchTransactions()">Tentar novamente</Button>
+      </div>
+
       <div v-else-if="store.transactions.length === 0" class="p-12 text-center text-white/50 flex flex-col items-center gap-2">
-        <span class="text-base font-semibold text-white/80">Nenhum lançamento localizado</span>
-        <span class="text-xs text-white/40">
-          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um arquivo OFX ou crie um lançamento manual acima.' }}
+        <span class="text-base font-semibold text-white/80">Nenhum lançamento encontrado</span>
+        <span class="text-xs text-white/50">
+          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um extrato OFX do seu banco ou registre um lançamento manual.' }}
         </span>
-        <button 
+        <button
           v-if="hasActiveFilters"
           @click="resetAllFilters"
-          class="mt-2 text-xs text-accent hover:underline cursor-pointer"
+          class="mt-2 px-3 py-2 text-xs text-accent hover:underline cursor-pointer"
         >
           Limpar todos os filtros
         </button>
+        <div v-else class="mt-3 flex flex-wrap justify-center gap-2">
+          <Button size="sm" class="gap-1.5" @click="isCreateModalOpen = true">
+            <PhPlus :size="15" weight="bold" />
+            <span>Novo Lançamento</span>
+          </Button>
+          <Button size="sm" variant="outline" class="gap-1.5" @click="isImportModalOpen = true">
+            <PhUploadSimple :size="15" />
+            <span>Importar OFX</span>
+          </Button>
+        </div>
       </div>
 
       <div v-else class="overflow-x-auto custom-scrollbar">
@@ -815,7 +872,7 @@ const isCredit = (t: Transaction) => {
                 </div>
                 <div class="min-w-0 flex-1">
                   <div class="text-sm font-bold text-white truncate group-hover:text-accent transition-colors">{{ t.name || t.memo || 'Sem nome' }}</div>
-                  <div class="text-xs text-white/40 truncate">{{ t.memo || getAccountById(t.account_id)?.name || 'Extrato' }}</div>
+                  <div class="text-xs text-white/50 truncate">{{ t.memo || getAccountById(t.account_id)?.name || 'Extrato' }}</div>
                 </div>
               </div>
 
@@ -827,7 +884,7 @@ const isCredit = (t: Transaction) => {
                 >
                   {{ isCredit(t) ? '+' : '' }}{{ formatCurrency(t.amount) }}
                 </div>
-                <div class="text-[10px] text-white/40 mt-0.5">
+                <div class="text-[10px] text-white/50 mt-0.5">
                   {{ formatDate(t.date_posted) }}
                 </div>
               </div>
@@ -847,6 +904,15 @@ const isCredit = (t: Transaction) => {
                   @toggle-secondary-tag="(tagId) => onSecondaryTagToggled(t.id, tagId)"
                 />
 
+                <!-- Tags Secundárias -->
+                <span
+                  v-for="tagId in (t.tags || []).slice(1)"
+                  :key="'msec-' + tagId"
+                  class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60"
+                >
+                  #{{ getTagById(tagId)?.name }}
+                </span>
+
                 <!-- Badge de Conta -->
                 <span class="px-2 py-0.5 rounded-full text-[10px] bg-white/5 border border-white/10 text-white/60">
                   {{ getAccountById(t.account_id)?.name || 'Conta' }}
@@ -863,11 +929,12 @@ const isCredit = (t: Transaction) => {
 
               <button 
                 type="button"
-                @click="handleDelete(t.id)" 
-                class="p-1.5 rounded-lg text-white/30 hover:text-red-400 active:text-red-400 transition-colors cursor-pointer"
+                @click="handleDelete(t.id)"
+                class="p-2.5 -m-1 rounded-lg text-white/50 hover:text-red-400 active:text-red-400 transition-colors cursor-pointer"
                 title="Excluir"
+                aria-label="Excluir lançamento"
               >
-                <PhTrash :size="15" />
+                <PhTrash :size="16" />
               </button>
             </div>
           </div>
@@ -877,7 +944,7 @@ const isCredit = (t: Transaction) => {
         <table class="hidden md:table w-full text-left border-collapse">
           <thead>
             <tr class="bg-white/[0.02] text-xs font-semibold text-white/50 border-b border-white/5">
-              <th class="p-4 min-w-[260px]">ESTABELECIMENTO / MEMO</th>
+              <th class="p-4 min-w-[260px]">DESCRIÇÃO</th>
               <th class="p-4 w-[130px]">DATA</th>
               <th class="p-4 min-w-[180px]">CATEGORIA PRINCIPAL</th>
               <th class="p-4 w-[140px]">CONTA</th>
@@ -902,14 +969,14 @@ const isCredit = (t: Transaction) => {
                   </div>
                   <div class="min-w-0 max-w-sm">
                     <div class="font-bold text-white truncate hover:text-accent transition-colors" :title="t.name || t.memo">{{ t.name || t.memo || 'Sem nome' }}</div>
-                    <div class="text-[11px] text-white/40 truncate" :title="t.memo">{{ t.memo || 'Sem observações' }}</div>
+                    <div class="text-[11px] text-white/50 truncate" :title="t.memo">{{ t.memo || 'Sem observações' }}</div>
                   </div>
                 </div>
               </td>
 
               <td class="p-4 text-white/70 whitespace-nowrap">
                 <div class="flex items-center gap-1.5">
-                  <PhCalendarBlank :size="14" class="text-white/40" />
+                  <PhCalendarBlank :size="14" class="text-white/50" />
                   <span>{{ formatDate(t.date_posted) }}</span>
                 </div>
               </td>
@@ -953,16 +1020,18 @@ const isCredit = (t: Transaction) => {
                   <button
                     type="button"
                     @click="openTransactionDetails(t)"
-                    class="p-1.5 rounded-lg text-white/30 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
-                    title="Ver detalhes completos / Editar"
+                    class="p-1.5 rounded-lg text-white/50 hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"
+                    title="Ver detalhes / Editar"
+                    aria-label="Ver detalhes e editar"
                   >
                     <PhPencilSimple :size="15" />
                   </button>
                   <button
                     type="button"
                     @click="handleDelete(t.id)"
-                    class="p-1.5 rounded-lg text-white/20 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
+                    class="p-1.5 rounded-lg text-white/50 hover:text-red-400 hover:bg-red-400/10 transition-colors cursor-pointer"
                     title="Excluir"
+                    aria-label="Excluir lançamento"
                   >
                     <PhTrash :size="15" />
                   </button>
@@ -980,15 +1049,15 @@ const isCredit = (t: Transaction) => {
           <div class="flex gap-2">
             <button
               :disabled="store.pagination.page === 1"
-              @click="store.fetchTransactions({ page: store.pagination.page - 1 })"
-              class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
+              @click="goToPage(store.pagination.page - 1)"
+              class="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
             >
               Anterior
             </button>
             <button
               :disabled="store.pagination.page === store.pagination.totalPages"
-              @click="store.fetchTransactions({ page: store.pagination.page + 1 })"
-              class="px-3 py-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
+              @click="goToPage(store.pagination.page + 1)"
+              class="px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 disabled:opacity-40 transition-colors cursor-pointer font-semibold"
             >
               Próxima
             </button>

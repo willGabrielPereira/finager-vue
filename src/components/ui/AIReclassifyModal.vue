@@ -2,8 +2,9 @@
 import { ref } from 'vue'
 import { PhSparkle, PhX, PhCircleNotch, PhCheckCircle } from '@phosphor-icons/vue'
 import { Button } from './button'
+import { useEscapeKey } from '@/composables/useEscapeKey'
 
-defineProps<{
+const props = defineProps<{
   isOpen: boolean
   loading?: boolean
   resultCount?: number | null
@@ -16,6 +17,9 @@ const emit = defineEmits<{
 
 const includeManual = ref(false)
 
+// Enquanto classifica, não fecha (o resultado se perderia)
+useEscapeKey(() => props.isOpen && !props.loading, () => emit('close'))
+
 const handleConfirm = () => {
   emit('confirm', includeManual.value)
 }
@@ -25,15 +29,20 @@ const handleConfirm = () => {
   <div 
     v-if="isOpen"
     class="fixed inset-0 z-[10002] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto"
-    @click="emit('close')"
+    @click="!loading && emit('close')"
   >
-    <div 
+    <div
       class="bg-surface border border-white/10 rounded-2xl w-full max-w-md max-h-[90dvh] flex flex-col shadow-2xl overflow-y-auto custom-scrollbar p-5 sm:p-6 relative gap-4 animate-in zoom-in-95 duration-200 text-white my-auto"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-modal-title"
       @click.stop
     >
-      <button 
-        @click="emit('close')" 
-        class="absolute top-4 right-4 text-white/50 hover:text-white p-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+      <button
+        @click="emit('close')"
+        :disabled="loading"
+        aria-label="Fechar"
+        class="absolute top-3 right-3 text-white/50 hover:text-white p-2 rounded-lg hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-40"
       >
         <PhX :size="20" />
       </button>
@@ -44,8 +53,8 @@ const handleConfirm = () => {
           <PhSparkle :size="22" weight="duotone" />
         </div>
         <div>
-          <h3 class="text-lg font-bold">Classificação Inteligente</h3>
-          <p class="text-xs text-white/50">Memória de comerciantes + IA local</p>
+          <h3 id="ai-modal-title" class="text-lg font-bold">Classificar com IA</h3>
+          <p class="text-xs text-white/50">Usa suas regras e o que você já categorizou</p>
         </div>
       </div>
 
@@ -55,7 +64,9 @@ const handleConfirm = () => {
         <div>
           <h4 class="text-base font-bold">Classificação Concluída!</h4>
           <p class="text-xs text-white/60 mt-1">
-            Foram categorizadas <span class="text-accent font-bold text-sm">{{ resultCount }}</span> transações com sucesso.
+            <template v-if="resultCount === 0">Nenhuma transação nova pôde ser categorizada desta vez.</template>
+            <template v-else-if="resultCount === 1"><span class="text-accent font-bold text-sm">1</span> transação foi categorizada.</template>
+            <template v-else><span class="text-accent font-bold text-sm">{{ resultCount }}</span> transações foram categorizadas.</template>
           </p>
         </div>
         <Button
@@ -70,7 +81,7 @@ const handleConfirm = () => {
       <!-- Estado: Formulário de Confirmação -->
       <div v-else class="flex flex-col gap-4">
         <p class="text-xs text-white/70 leading-relaxed">
-          Como deseja aplicar a inteligência artificial nas transações do seu extrato?
+          Quais transações a IA deve categorizar?
         </p>
 
         <div class="flex flex-col gap-2">
@@ -105,9 +116,9 @@ const handleConfirm = () => {
               class="mt-0.5 accent-accent" 
             />
             <div class="flex flex-col gap-0.5">
-              <span class="text-xs font-bold text-white">Incluir também transações manuais</span>
+              <span class="text-xs font-bold text-white">Todas, inclusive as que eu já categorizei</span>
               <span class="text-[11px] text-white/50">
-                Reavalia todo o histórico da família aplicando os novos padrões aprendidos.
+                Pode substituir categorias escolhidas por você em todo o histórico da família.
               </span>
             </div>
           </label>
