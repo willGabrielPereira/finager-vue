@@ -13,6 +13,9 @@ dist-ssr
 *.local
 .env
 
+# Artefato temporário que o Vite cria ao carregar vite.config.ts em ESM
+vite.config.*.timestamp-*
+
 # oh-my-claudecode runtime state (plans, logs, session data) — .omc/skills/** stays committable
 .omc/*
 !.omc/skills/
