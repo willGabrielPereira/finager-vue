@@ -1,5 +1,6 @@
 ﻿import { defineStore } from 'pinia';
 import { api } from '../api/axios';
+import { useAdminAuthStore } from './adminAuth';
 
 export interface UserProfile {
   user_id: string;
@@ -12,6 +13,7 @@ export interface UserProfile {
   onboarding_completed?: boolean;
   onboarding_step?: number;
   created_at?: string;
+  role: 'user' | 'moderator' | 'admin';
 }
 
 export interface FamilyMember {
@@ -32,6 +34,9 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isAuthenticated: (state) => !!state.accessToken,
     isOnboardingCompleted: (state) => !!state.user?.onboarding_completed,
+    isAdmin: (state) => state.user?.role === 'admin',
+    isModerator: (state) => state.user?.role === 'moderator',
+    canAccessAdmin: (state) => state.user?.role === 'admin' || state.user?.role === 'moderator',
   },
   
   actions: {
@@ -144,14 +149,21 @@ export const useAuthStore = defineStore('auth', {
     async logout() {
       if (this.refreshToken) {
         try {
-          await api.post('/auth/logout', { refresh_token: this.refreshToken });
+          const elevatedToken = useAdminAuthStore().elevatedToken;
+          // Envia o token de elevação junto pro backend poder revogá-lo também no logout
+          // (header só é anexado quando existe elevação ativa)
+          await api.post(
+            '/auth/logout',
+            { refresh_token: this.refreshToken },
+            elevatedToken ? { headers: { 'X-Admin-Elevation': elevatedToken } } : undefined,
+          );
         } catch (e) {
           // Ignore error on logout
         }
       }
       this.clearAuth();
     },
-    
+
     clearAuth() {
       this.accessToken = null;
       this.refreshToken = null;
@@ -160,6 +172,8 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('access_token');
       localStorage.removeItem('refresh_token');
       sessionStorage.removeItem('finager_tour_started');
+      // Elevação admin nunca sobrevive ao fim da sessão (logout ou falha de refresh)
+      useAdminAuthStore().clear();
     }
   }
 });

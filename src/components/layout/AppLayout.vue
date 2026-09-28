@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, provide, onMounted, watch } from 'vue'
+import { computed, ref, provide, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Sidebar from './Sidebar.vue'
 import Topbar from './Topbar.vue'
@@ -7,7 +7,7 @@ import BottomNav from './BottomNav.vue'
 import CreateTransactionModal from '../ui/CreateTransactionModal.vue'
 import ImportOFXModal from '../ui/ImportOFXModal.vue'
 import OFXGuideModal from '../ui/OFXGuideModal.vue'
-import { PhPlus, PhUploadSimple, PhBank, PhX, PhFileText, PhSparkle, PhUser, PhListChecks, PhCrown, PhSignOut, PhCaretRight } from '@phosphor-icons/vue'
+import { PhPlus, PhUploadSimple, PhBank, PhX, PhFileText, PhSparkle, PhUser, PhListChecks, PhCrown, PhSignOut, PhCaretRight, PhShieldCheck } from '@phosphor-icons/vue'
 import { useEscapeKey } from '../../composables/useEscapeKey'
 import { useTransactionsStore } from '../../stores/transactions'
 import { useAuthStore } from '../../stores/auth'
@@ -28,12 +28,15 @@ useEscapeKey(
 )
 
 // Itens de uso raro no mobile (fora da barra inferior)
-const moreItems = [
+const moreItems = computed(() => [
   { label: 'Perfil & Família', hint: 'Seus dados, senha e membros', path: '/profile', icon: PhUser },
   { label: 'Contas bancárias', hint: 'Contas, cartões e privacidade', path: '/accounts', icon: PhBank },
   { label: 'Regras automáticas', hint: 'Categoria fixa por estabelecimento', path: '/tag-rules', icon: PhListChecks },
   { label: 'Plano & Cobrança', hint: 'Limites e assinatura', path: '/billing', icon: PhCrown },
-]
+  ...(authStore.canAccessAdmin
+    ? [{ label: 'Admin', hint: 'Painel administrativo', path: '/admin/reauth', icon: PhShieldCheck }]
+    : []),
+])
 
 const goFromMore = (path: string) => {
   isMobileMoreSheetOpen.value = false

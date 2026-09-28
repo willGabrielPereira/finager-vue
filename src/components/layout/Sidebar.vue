@@ -1,22 +1,24 @@
 ﻿<script setup lang="ts">
-import { onMounted } from 'vue'
-import { 
-  PhSquaresFour, 
-  PhListDashes, 
-  PhBank, 
-  PhUploadSimple, 
-  PhTag, 
-  PhUser, 
+import { computed, onMounted } from 'vue'
+import {
+  PhSquaresFour,
+  PhListDashes,
+  PhBank,
+  PhUploadSimple,
+  PhTag,
+  PhUser,
   PhPlus,
   PhWallet,
   PhFileText,
   PhSparkle,
   PhCrown,
   PhLightning,
-  PhListChecks
+  PhListChecks,
+  PhShieldCheck
 } from '@phosphor-icons/vue'
 import { useRoute } from 'vue-router'
 import { useBillingStore } from '../../stores/billing'
+import { useAuthStore } from '../../stores/auth'
 
 defineEmits<{
   (e: 'new-transaction'): void
@@ -27,6 +29,7 @@ defineEmits<{
 
 const route = useRoute()
 const billingStore = useBillingStore()
+const authStore = useAuthStore()
 
 onMounted(() => {
   if (!billingStore.planStatus) {
@@ -34,7 +37,7 @@ onMounted(() => {
   }
 })
 
-const navItems = [
+const navItems = computed(() => [
   { name: 'Dashboard', path: '/', icon: PhSquaresFour, tour: 'nav-dashboard' },
   { name: 'Transações', path: '/transactions', icon: PhListDashes, tour: 'nav-transactions' },
   { name: 'Contas Bancárias', path: '/accounts', icon: PhBank, tour: 'nav-accounts' },
@@ -42,7 +45,8 @@ const navItems = [
   { name: 'Regras Automáticas', path: '/tag-rules', icon: PhListChecks, tour: 'nav-tag-rules' },
   { name: 'Plano & Cobrança', path: '/billing', icon: PhCrown, tour: 'nav-billing' },
   { name: 'Meu Perfil', path: '/profile', icon: PhUser, tour: 'nav-profile' },
-]
+  ...(authStore.canAccessAdmin ? [{ name: 'Admin', path: '/admin/reauth', icon: PhShieldCheck, tour: 'nav-admin' }] : []),
+])
 </script>
 
 <template>

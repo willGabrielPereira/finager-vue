@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { useAuthStore } from '../stores/auth';
+import { useAdminAuthStore } from '../stores/adminAuth';
 import router from '../router';
 import { logError } from '../utils/logger';
 
@@ -41,6 +42,16 @@ api.interceptors.request.use(config => {
   if (authStore.accessToken) {
     config.headers.Authorization = `Bearer ${authStore.accessToken}`;
   }
+
+  // Rotas /admin/* exigem elevação extra: se houver token elevado, anexa no header
+  // dedicado (não substitui o Authorization normal, que já foi setado acima).
+  if (config.url?.startsWith('/admin')) {
+    const adminAuthStore = useAdminAuthStore();
+    if (adminAuthStore.elevatedToken) {
+      config.headers['X-Admin-Elevation'] = adminAuthStore.elevatedToken;
+    }
+  }
+
   return config;
 }, error => {
   logApiError(error);
@@ -51,6 +62,22 @@ api.interceptors.response.use(response => {
   return response;
 }, async error => {
   const originalRequest = error.config;
+
+  // Elevação de admin ausente ou expirada: limpa o estado elevado e manda o usuário
+  // reautenticar antes de voltar para a rota que ele tentava acessar. Condição
+  // mutuamente exclusiva com o bloco de 401/refresh abaixo (status diferente).
+  if (error.response?.status === 403 && error.response?.data?.error?.code === 'E_ELEVATION_REQUIRED') {
+    const adminAuthStore = useAdminAuthStore();
+    adminAuthStore.clear();
+    // Evita redirect=/admin/reauth?redirect=... aninhado se chamadas paralelas
+    // falharem enquanto já se está na própria tela de reauth.
+    if (router.currentRoute.value.path !== '/admin/reauth') {
+      const currentPath = router.currentRoute.value.fullPath;
+      router.push({ path: '/admin/reauth', query: { redirect: currentPath } });
+    }
+    logApiError(error);
+    return Promise.reject(error);
+  }
 
   if (error.response?.status === 401 && !originalRequest._retry) {
     if (isRefreshing) {
