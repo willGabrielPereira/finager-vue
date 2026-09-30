@@ -16,3 +16,10 @@ export function getRedirectTarget(query: Record<string, LocationQueryValue | Loc
 export function getInviteToken(query: Record<string, LocationQueryValue | LocationQueryValue[]>): string {
   return firstQueryValue(query.invite)
 }
+
+// Lê um token do FRAGMENTO da URL (#token=...), não da querystring: o back-end usa fragmento
+// nos e-mails de redefinição de senha e convite para o token nunca vazar em logs de servidor/Referer.
+export function getHashToken(): string {
+  const match = window.location.hash.match(/token=([^&]*)/)
+  return match ? decodeURIComponent(match[1]) : ''
+}

@@ -133,7 +133,7 @@ export const useAuthStore = defineStore('auth', {
       return data;
     },
 
-    async updateProfile(payload: { login?: string; email?: string; family_name?: string }) {
+    async updateProfile(payload: { login?: string; email?: string; family_name?: string; current_password?: string }) {
       const { data } = await api.put('/me', payload);
       this.user = data;
       return data;
@@ -144,6 +144,19 @@ export const useAuthStore = defineStore('auth', {
         current_password: currentPassword,
         new_password: newPassword,
       });
+    },
+
+    async forgotPassword(email: string) {
+      const { data } = await api.post('/auth/password/forgot', { email });
+      return data;
+    },
+
+    async resetPassword(token: string, newPassword: string) {
+      await api.post('/auth/password/reset', { token, new_password: newPassword });
+    },
+
+    async unsubscribeEmail(u: string, s: string) {
+      await api.post('/email/unsubscribe', { u, s });
     },
     
     async logout() {

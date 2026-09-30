@@ -17,6 +17,11 @@
 
 import Swal from 'sweetalert2';
 
+// Desembrulha o corpo de erro da API, que aparece em duas formas: `{ error: { code, message } }`
+// (response.Error) ou `{ errors: [{ message, rule, field }] }` (response.Validations, 422).
+export const unwrapApiError = (err: any, fallback: string): string =>
+  err?.response?.data?.error?.message || err?.response?.data?.errors?.[0]?.message || fallback;
+
 // SweetAlert2 renderiza `title` como HTML, não como texto (usa innerHTML internamente).
 // `text` já é seguro (vira textContent). Se algum chamador algum dia interpolar nome de
 // conta/categoria/usuário no título, isso vira XSS armazenado — como já aconteceu aqui

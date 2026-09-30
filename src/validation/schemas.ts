@@ -70,3 +70,13 @@ export const changePasswordSchema = z
     message: 'A confirmação não confere com a nova senha digitada.',
     path: ['confirmPassword'],
   })
+
+export const resetPasswordSchema = z
+  .object({
+    newPassword: minLengthText(8, 'A nova senha deve possuir pelo menos 8 caracteres.'),
+    confirmPassword: z.string(),
+  })
+  .refine((data) => data.newPassword === data.confirmPassword, {
+    message: 'A confirmação não confere com a nova senha digitada.',
+    path: ['confirmPassword'],
+  })

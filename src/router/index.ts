@@ -8,6 +8,11 @@ const router = createRouter({
   routes: [
     { path: '/login', component: () => import('../views/LoginView.vue'), meta: { public: true } },
     { path: '/register', component: () => import('../views/RegisterView.vue'), meta: { public: true } },
+    { path: '/esqueci-senha', component: () => import('../views/ForgotPasswordView.vue'), meta: { public: true } },
+    // "open": acessível autenticado ou não (link chega por e-mail, sessão pode estar aberta em outra aba)
+    { path: '/redefinir-senha', component: () => import('../views/ResetPasswordView.vue'), meta: { open: true } },
+    { path: '/convite', component: () => import('../views/AcceptInviteView.vue'), meta: { open: true } },
+    { path: '/descadastrar', component: () => import('../views/UnsubscribeView.vue'), meta: { open: true } },
     { path: '/', component: () => import('../views/DashboardView.vue') },
     { path: '/transactions', component: () => import('../views/TransactionsView.vue') },
     { path: '/accounts', component: () => import('../views/AccountsView.vue') },
@@ -32,7 +37,9 @@ router.beforeEach(async (to, _from, next) => {
     await authStore.fetchMe();
   }
 
-  if (!to.meta.public && !authStore.isAuthenticated) {
+  if (to.meta.open) {
+    next();
+  } else if (!to.meta.public && !authStore.isAuthenticated) {
     // Guarda o link original: após o login, o usuário volta para ele em vez de cair sempre no Dashboard
     next({ path: '/login', query: { redirect: to.fullPath } });
   } else if (to.meta.public && authStore.isAuthenticated) {

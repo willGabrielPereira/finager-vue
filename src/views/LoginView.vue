@@ -127,10 +127,13 @@ const handleLogin = async () => {
         </div>
 
         <div>
-          <label for="login-password" class="text-xs font-semibold text-white/80 mb-1.5 flex items-center gap-1.5">
-            <PhLock :size="14" />
-            <span>Senha</span>
-          </label>
+          <div class="flex items-center justify-between mb-1.5">
+            <label for="login-password" class="text-xs font-semibold text-white/80 flex items-center gap-1.5">
+              <PhLock :size="14" />
+              <span>Senha</span>
+            </label>
+            <router-link to="/esqueci-senha" class="text-[11px] text-accent hover:underline">Esqueceu a senha?</router-link>
+          </div>
           <Input id="login-password"
             v-model="password"
             type="password"

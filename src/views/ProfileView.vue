@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { showAlert, toast } from '../utils/feedback'
+import { showAlert, toast, unwrapApiError } from '../utils/feedback'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal.vue'
 import { useAuthStore } from '../stores/auth'
 import { useBillingStore } from '../stores/billing'
@@ -49,9 +49,13 @@ const router = useRouter()
 const login = ref('')
 const email = ref('')
 const familyName = ref('')
+const currentPasswordForEmail = ref('')
 const profileLoading = ref(false)
 const profileSuccess = ref(false)
 const profileError = ref('')
+
+// PUT /me exige senha atual só quando o e-mail muda de fato (mesma regra do backend)
+const emailChanged = computed(() => email.value.trim().toLowerCase() !== (authStore.user?.email || '').toLowerCase())
 
 // Password Form
 const currentPassword = ref('')
@@ -105,19 +109,26 @@ const handleSaveProfile = async () => {
     return
   }
 
+  if (emailChanged.value && !currentPasswordForEmail.value.trim()) {
+    profileError.value = 'Informe sua senha atual para alterar o e-mail.'
+    return
+  }
+
   profileLoading.value = true
   try {
     await authStore.updateProfile({
       login: data.login,
       email: data.email,
       family_name: familyName.value.trim(),
+      current_password: emailChanged.value ? currentPasswordForEmail.value : undefined,
     })
+    currentPasswordForEmail.value = ''
     profileSuccess.value = true
     setTimeout(() => {
       profileSuccess.value = false
     }, 3000)
   } catch (err: any) {
-    profileError.value = err.response?.data?.message || err.response?.data?.error || 'Falha ao atualizar dados.'
+    profileError.value = unwrapApiError(err, 'Falha ao atualizar dados.')
   } finally {
     profileLoading.value = false
   }
@@ -486,6 +497,16 @@ const formatDate = (dateStr?: string) => {
               v-model="email"
               type="email"
               placeholder="ex: usuario@email.com"
+            />
+          </div>
+
+          <div v-if="emailChanged">
+            <label for="profile-current-password-email" class="text-xs font-semibold text-white/80 mb-1.5 block">Senha Atual (necessária para trocar o e-mail)</label>
+            <Input id="profile-current-password-email"
+              v-model="currentPasswordForEmail"
+              type="password"
+              placeholder="••••••••"
+              autocomplete="current-password"
             />
           </div>
 
