@@ -9,7 +9,7 @@ const route = useRoute();
 // Seleciona o shell: área admin, sem layout (público) ou app comum
 const shell = computed(() => {
   if (route.meta.layout === 'admin') return AdminLayout;
-  if (route.meta.public) return 'div';
+  if (route.meta.public || route.meta.open) return 'div';
   return AppLayout;
 });
 </script>
