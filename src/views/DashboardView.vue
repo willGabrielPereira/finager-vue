@@ -564,7 +564,7 @@ const formatDate = (dateString: string) => {
                 class="text-xs text-accent hover:underline flex items-center gap-1 px-2 py-2 font-medium cursor-pointer"
               >
                 <PhUploadSimple :size="15" />
-                <span>Importar extrato OFX</span>
+                <span>Importar extrato OFX/CSV</span>
               </button>
               <button
                 type="button"

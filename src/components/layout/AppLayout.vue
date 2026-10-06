@@ -191,7 +191,7 @@ const onOFXImported = () => {
             <PhUploadSimple :size="20" />
           </div>
           <div>
-            <div class="text-sm">Importar extrato OFX</div>
+            <div class="text-sm">Importar extrato (OFX/CSV)</div>
             <div class="text-[11px] text-white/60 font-normal">Extrato bancário ou fatura de cartão</div>
           </div>
         </button>

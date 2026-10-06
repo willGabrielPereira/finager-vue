@@ -510,7 +510,7 @@ const isCredit = (t: Transaction) => {
           @click="isImportModalOpen = true"
         >
           <PhUploadSimple :size="15" />
-          <span>Importar OFX</span>
+          <span>Importar OFX/CSV</span>
         </Button>
 
         <Button 
@@ -831,7 +831,7 @@ const isCredit = (t: Transaction) => {
       <div v-else-if="store.transactions.length === 0" class="p-12 text-center text-white/50 flex flex-col items-center gap-2">
         <span class="text-base font-semibold text-white/80">Nenhum lançamento encontrado</span>
         <span class="text-xs text-white/50">
-          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um extrato OFX do seu banco ou registre um lançamento manual.' }}
+          {{ hasActiveFilters ? 'Tente ajustar ou limpar os filtros para ver mais resultados.' : 'Importe um extrato OFX ou CSV do seu banco ou registre um lançamento manual.' }}
         </span>
         <button
           v-if="hasActiveFilters"
@@ -847,7 +847,7 @@ const isCredit = (t: Transaction) => {
           </Button>
           <Button size="sm" variant="outline" class="gap-1.5" @click="isImportModalOpen = true">
             <PhUploadSimple :size="15" />
-            <span>Importar OFX</span>
+            <span>Importar OFX/CSV</span>
           </Button>
         </div>
       </div>

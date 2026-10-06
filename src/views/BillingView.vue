@@ -342,7 +342,7 @@ const handleApplyCoupon = async () => {
               </li>
               <li class="flex items-center gap-2.5">
                 <PhCheck :size="16" class="text-accent shrink-0" weight="bold" />
-                <span>Importação ilimitada de arquivos <strong>OFX</strong></span>
+                <span>Importação ilimitada de arquivos <strong>OFX e CSV</strong></span>
               </li>
               <li class="flex items-center gap-2.5">
                 <PhCheck :size="16" class="text-accent shrink-0" weight="bold" />

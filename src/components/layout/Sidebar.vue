@@ -81,7 +81,7 @@ const navItems = computed(() => [
         class="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-white/5 border border-white/10 text-white font-semibold text-xs hover:bg-white/10 transition-all cursor-pointer"
       >
         <PhUploadSimple :size="16" />
-        <span>Importar OFX</span>
+        <span>Importar OFX/CSV</span>
       </button>
     </div>
 

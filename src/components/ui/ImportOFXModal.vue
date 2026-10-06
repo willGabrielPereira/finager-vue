@@ -84,7 +84,7 @@ const submit = async () => {
     return
   }
   if (!selectedFile.value) {
-    importError.value = 'Selecione o arquivo OFX para importar'
+    importError.value = 'Selecione o arquivo OFX ou CSV para importar'
     return
   }
 
@@ -111,7 +111,7 @@ const submit = async () => {
     emit('imported')
   } catch (err: any) {
     console.error('Falha ao importar OFX:', err)
-    importError.value = err.response?.data?.message || err.response?.data?.error || 'Erro ao processar arquivo OFX'
+    importError.value = err.response?.data?.message || err.response?.data?.error || 'Erro ao processar o arquivo'
   } finally {
     importing.value = false
   }
@@ -149,7 +149,7 @@ const reset = () => {
       </button>
 
       <div>
-        <h3 id="import-ofx-title" class="text-xl font-bold">Importar Extrato OFX</h3>
+        <h3 id="import-ofx-title" class="text-xl font-bold">Importar Extrato (OFX ou CSV)</h3>
         <p class="text-xs text-white/50">Suporta contas correntes e cartões de crédito (Nubank, Santander, etc.)</p>
       </div>
 
@@ -232,7 +232,7 @@ const reset = () => {
           <input
             ref="fileInputRef"
             type="file"
-            accept=".ofx"
+            accept=".ofx,.csv"
             class="hidden"
             @change="handleFileChange"
           />
@@ -247,8 +247,8 @@ const reset = () => {
           </div>
           <div v-else>
             <p class="text-xs font-semibold text-white/80">
-              <span class="md:hidden">Toque para escolher o arquivo .OFX</span>
-              <span class="hidden md:inline">Arraste seu arquivo .OFX aqui</span>
+              <span class="md:hidden">Toque para escolher o arquivo .OFX ou .CSV</span>
+              <span class="hidden md:inline">Arraste seu arquivo .OFX ou .CSV aqui</span>
             </p>
             <p class="hidden md:block text-[11px] text-white/50 mt-0.5">ou clique para selecionar</p>
           </div>

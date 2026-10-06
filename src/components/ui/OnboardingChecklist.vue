@@ -194,7 +194,7 @@ defineExpose({
             <PhCheckCircle v-if="hasImported" :size="18" weight="fill" class="text-accent shrink-0" />
             <PhCircle v-else :size="18" class="text-white/50 shrink-0" />
             <span class="text-xs font-bold" :class="hasImported ? 'line-through text-white/50' : 'text-white'">
-              2. Importar 1º OFX
+              2. Importar 1º extrato
             </span>
           </div>
           <PhUploadSimple :size="16" class="text-white/50" />
