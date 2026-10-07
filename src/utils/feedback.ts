@@ -136,5 +136,29 @@ export const showAlert = {
       buttonsStyling: false,
     });
     return res.isConfirmed;
+  },
+  /** Pede um texto obrigatório ao usuário. Retorna null se cancelar. */
+  async prompt(options: { title: string; text?: string; placeholder?: string; confirmText?: string; maxLength?: number }): Promise<string | null> {
+    const res = await Swal.fire({
+      icon: 'question',
+      title: escapeHtml(options.title),
+      text: options.text,
+      input: 'text',
+      inputPlaceholder: options.placeholder,
+      inputAttributes: { maxlength: String(options.maxLength ?? 200) },
+      inputValidator: (v) => (v.trim() ? null : 'Campo obrigatório'),
+      showCancelButton: true,
+      confirmButtonText: options.confirmText || 'Confirmar',
+      cancelButtonText: 'Cancelar',
+      background: '#0f172a',
+      color: '#ffffff',
+      customClass: {
+        popup: 'finager-swal-popup',
+        confirmButton: 'finager-swal-confirm-btn',
+        cancelButton: 'finager-swal-cancel-btn',
+      },
+      buttonsStyling: false,
+    });
+    return res.isConfirmed ? String(res.value).trim() : null;
   }
 };

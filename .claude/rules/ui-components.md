@@ -39,6 +39,7 @@ await showAlert.success('Concluído', 'Extrato importado com sucesso.');
 ## 2. Padrão de Componentes Primitivos (shadcn-vue)
 - Para novos componentes reutilizáveis primitivos (botões, cards, diálogos, comboboxes, dropdowns), utilize a convenção **shadcn-vue** em `src/components/ui/`.
 - Utilize o helper de merge de classes `cn()` de `@/lib/utils` para combinar classes Tailwind dinâmicas com segurança.
+- **PROIBIDO `<select>` nativo** (nem `<input type="date">`/`<datalist>` nativos estilizados na unha): use sempre `AppSelect` (`src/components/ui/AppSelect.vue`, opções `{ value, label }`) ou os componentes padrão em `src/components/ui/`.
 - Mantenha a consistência com os componentes existentes construídos sob o tema Dark OLED.
 
 ---

@@ -160,6 +160,20 @@ export const useAdminStore = defineStore('admin', {
       return data;
     },
 
+    // Baixa o dump SQL da família (exige concessão ativa da família e um motivo, que vai para auditoria).
+    async downloadFamilyDump(familyId: string, reason: string) {
+      const { data } = await api.get(`/admin/families/${familyId}/dump`, {
+        params: { reason },
+        responseType: 'blob',
+      });
+      const url = URL.createObjectURL(data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `finager-family-${familyId}.sql`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+
     async updateCoupon(id: string, payload: { active?: boolean; max_uses?: number; expires_at?: string }) {
       const { data } = await api.patch(`/admin/coupons/${id}`, payload);
       await this.fetchCoupons();

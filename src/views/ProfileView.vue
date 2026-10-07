@@ -2,8 +2,10 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { showAlert, toast, unwrapApiError } from '../utils/feedback'
+import AppSelect from '../components/ui/AppSelect.vue'
 import DeleteAccountModal from '../components/ui/DeleteAccountModal.vue'
 import { useAuthStore } from '../stores/auth'
+import { api } from '../api/axios'
 import { useBillingStore } from '../stores/billing'
 import { profileInfoSchema, changePasswordSchema, optionalEmailSchema } from '@/validation/schemas'
 import { useFormValidation } from '@/composables/useFormValidation'
@@ -28,7 +30,8 @@ import {
   PhLightning, 
   PhRocketLaunch, 
   PhShieldCheck,
-  PhShareNetwork
+  PhShareNetwork,
+  PhLifebuoy
 } from '@phosphor-icons/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -84,7 +87,32 @@ const openDeleteAccountModal = () => {
   isDeleteModalOpen.value = true
 }
 
+// Acesso do suporte aos dados da família (concedido por prazo; qualquer membro pode alterar)
+const supportUntil = ref<string | null>(null)
+const supportDays = ref(7)
+const supportDayOptions = [1, 3, 7, 15, 30].map(d => ({ value: d, label: d === 1 ? '1 dia' : `${d} dias` }))
+const supportLoading = ref(false)
+const supportActive = computed(() => !!supportUntil.value)
+
+const applySupport = (d: { enabled: boolean; until?: string }) => {
+  supportUntil.value = d.enabled ? d.until || null : null
+}
+
+const setSupportAccess = async (enabled: boolean) => {
+  supportLoading.value = true
+  try {
+    const { data } = await api.put('/family/support-access', { enabled, days: supportDays.value })
+    applySupport(data)
+    toast.success(enabled ? 'Acesso do suporte concedido' : 'Acesso do suporte revogado')
+  } catch (err: any) {
+    toast.error(unwrapApiError(err, 'Falha ao atualizar acesso do suporte.'))
+  } finally {
+    supportLoading.value = false
+  }
+}
+
 onMounted(async () => {
+  api.get('/family/support-access').then(({ data }) => applySupport(data)).catch(() => {})
   await Promise.all([
     authStore.fetchMe(),
     authStore.fetchFamilyMembers(),
@@ -599,6 +627,34 @@ const formatDate = (dateStr?: string) => {
         </form>
       </Card>
     </div>
+
+    <!-- Acesso do suporte -->
+    <Card class="p-6 shadow-xl flex flex-col gap-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <PhLifebuoy :size="18" weight="duotone" class="text-accent" />
+            <span>Acesso do Suporte aos Dados</span>
+            <Badge v-if="supportActive" variant="secondary">Ativo</Badge>
+          </h3>
+          <p class="text-xs text-white/50 mt-1 max-w-2xl leading-relaxed">
+            Para ajudar a resolver um problema, o suporte pode baixar uma cópia dos dados da família. Só é possível enquanto você mantiver o acesso liberado; cada download é registrado e os membros são avisados por e-mail.
+          </p>
+          <p v-if="supportActive" class="text-xs text-accent mt-2">
+            Liberado até {{ new Date(supportUntil!).toLocaleString('pt-BR') }}.
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0">
+          <div class="w-32"><AppSelect v-model="supportDays" :options="supportDayOptions" :disabled="supportLoading" :teleport="true" /></div>
+          <Button size="sm" :disabled="supportLoading" @click="setSupportAccess(true)">
+            {{ supportActive ? 'Renovar' : 'Liberar acesso' }}
+          </Button>
+          <Button v-if="supportActive" size="sm" variant="destructive" :disabled="supportLoading" @click="setSupportAccess(false)">
+            Revogar
+          </Button>
+        </div>
+      </div>
+    </Card>
 
     <!-- Zona de Privacidade e Direitos LGPD -->
     <Card class="p-6 border-red-500/20 shadow-xl flex flex-col gap-4">

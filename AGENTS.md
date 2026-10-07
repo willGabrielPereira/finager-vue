@@ -37,7 +37,8 @@ npm run preview
 3. **Ícones SVG Padronizados:**
    - Utilize `@phosphor-icons/vue`. Nunca utilize emojis como ícones de interface.
    - Ícones de ação/destaque: `weight="duotone"`. Ícones informativos padrão: `weight="regular"`.
-4. **Padrão de Componentes de UI (shadcn-vue):**
+4. **Proibido `<select>` nativo:** use sempre `AppSelect` (`src/components/ui/AppSelect.vue`) ou outro componente padrão de `src/components/ui/`.
+5. **Padrão de Componentes de UI (shadcn-vue):**
    - Para novos componentes de UI primitivos (botões, diálogos, dropdowns, inputs), siga o padrão **shadcn-vue** configurado em `components.json` e utilitário `cn()` em `src/lib/utils.ts`.
 
 ---

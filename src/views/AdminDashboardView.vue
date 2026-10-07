@@ -17,7 +17,8 @@ import {
   PhWarningCircle,
   PhChartPieSlice,
   PhToggleLeft,
-  PhToggleRight
+  PhToggleRight,
+  PhDownloadSimple
 } from '@phosphor-icons/vue'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -109,6 +110,32 @@ const formatDateTime = (value: string | null) => {
 const formatDateShort = (value: string | null) => {
   if (!value) return '—'
   return new Date(value).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
+
+const dumpingFamilyId = ref<string | null>(null)
+
+const handleFamilyDump = async (familyId: string) => {
+  const reason = await showAlert.prompt({
+    title: 'Baixar dados da família',
+    text: 'Informe o motivo/ticket. Fica registrado em auditoria e os membros são avisados por e-mail.',
+    placeholder: 'Ex: ticket #123',
+    confirmText: 'Baixar dump',
+  })
+  if (!reason) return
+  dumpingFamilyId.value = familyId
+  try {
+    await adminStore.downloadFamilyDump(familyId, reason)
+  } catch (err: any) {
+    // Resposta é blob: o JSON de erro precisa ser lido do texto.
+    let msg = 'Falha ao baixar o dump.'
+    try {
+      const body = JSON.parse(await err.response.data.text())
+      msg = body?.error?.message || body?.message || msg
+    } catch { /* mantém mensagem padrão */ }
+    toast.error(msg)
+  } finally {
+    dumpingFamilyId.value = null
+  }
 }
 
 // ---------- Administradores ----------
@@ -327,6 +354,7 @@ const handleToggleCoupon = async (coupon: AdminCoupon) => {
               <th class="p-3.5">E-mail</th>
               <th class="p-3.5">Último Login</th>
               <th class="p-3.5">Última Transação</th>
+              <th class="p-3.5"></th>
             </tr>
           </thead>
           <tbody class="divide-y divide-white/5 text-xs">
@@ -335,6 +363,12 @@ const handleToggleCoupon = async (coupon: AdminCoupon) => {
               <td class="p-3.5 text-white/60">{{ item.email }}</td>
               <td class="p-3.5 text-white/60 whitespace-nowrap">{{ formatDateTime(item.last_login_at) }}</td>
               <td class="p-3.5 text-white/60 whitespace-nowrap">{{ formatDateTime(item.last_transaction_at) }}</td>
+              <td class="p-3.5 text-right">
+                <Button size="sm" variant="outline" class="gap-1.5" :disabled="dumpingFamilyId === item.family_id" @click="handleFamilyDump(item.family_id)">
+                  <PhDownloadSimple :size="14" weight="bold" />
+                  <span>Dump</span>
+                </Button>
+              </td>
             </tr>
           </tbody>
         </table>
