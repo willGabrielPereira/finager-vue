@@ -46,6 +46,7 @@ const name = ref('')
 const memo = ref('')
 const accountId = ref('')
 const selectedTagId = ref('')
+const secondaryTagIds = ref<string[]>([])
 const datePosted = ref('')
 const status = ref<'POSTED' | 'PLANNED' | 'PENDING_RECONCILIATION' | 'RECONCILED'>('POSTED')
 
@@ -107,6 +108,7 @@ watch(
       memo.value = tx.memo || ''
       accountId.value = tx.account_id || ''
       selectedTagId.value = tx.tags && tx.tags.length > 0 ? tx.tags[0] : ''
+      secondaryTagIds.value = (tx.tags || []).slice(1)
       status.value = tx.status || 'POSTED'
       
       if (tx.date_posted) {
@@ -144,6 +146,17 @@ const formatDatePretty = (isoStr: string) => {
   })
 }
 
+// Mesma semântica da listagem: trocar a principal preserva as extras; limpar remove todas
+const onCategorySelected = (tagId: string | null) => {
+  secondaryTagIds.value = tagId ? secondaryTagIds.value.filter((id) => id !== tagId) : []
+}
+
+const toggleSecondaryTag = (tagId: string) => {
+  secondaryTagIds.value = secondaryTagIds.value.includes(tagId)
+    ? secondaryTagIds.value.filter((id) => id !== tagId)
+    : [...secondaryTagIds.value, tagId]
+}
+
 const handleSave = async () => {
   if (!props.transaction) return
   const amountCheck = positiveAmountSchema.safeParse(amount.value)
@@ -157,7 +170,7 @@ const handleSave = async () => {
 
   try {
     const finalAmount = type.value === 'DEBIT' ? -Math.abs(amountCheck.data) : Math.abs(amountCheck.data)
-    const tagsArray = selectedTagId.value ? [selectedTagId.value] : []
+    const tagsArray = selectedTagId.value ? [selectedTagId.value, ...secondaryTagIds.value] : []
 
     const payload: Record<string, any> = {
       name: name.value.trim(),
@@ -346,7 +359,12 @@ const handleDelete = async () => {
             <TagCombobox
               v-model="selectedTagId"
               placeholder="Sem Categoria"
-              size="sm"
+              class="bg-[#0b1329] border-white/10 h-9 text-xs"
+              :clearable="false"
+              :secondary-tags="secondaryTagIds"
+              allow-secondary-tags
+              @select-category="onCategorySelected"
+              @toggle-secondary-tag="toggleSecondaryTag"
             />
           </div>
 

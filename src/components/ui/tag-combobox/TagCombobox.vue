@@ -194,7 +194,7 @@ const handleKeydown = (e: KeyboardEvent) => {
         :disabled="disabled"
         :class="
           cn(
-            'flex h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-bg px-3.5 py-2.5 text-sm transition-all duration-200 cursor-pointer outline-none hover:border-white/20 focus:border-accent focus:ring-2 focus:ring-accent/50',
+            'flex h-11 w-full items-center justify-between rounded-xl border border-white/10 bg-bg px-3.5 py-0 text-sm leading-5 transition-all duration-200 cursor-pointer outline-none hover:border-white/20 focus:border-accent focus:ring-2 focus:ring-accent/50',
             disabled && 'opacity-50 cursor-not-allowed',
             props.class
           )
@@ -206,11 +206,11 @@ const handleKeydown = (e: KeyboardEvent) => {
               class="w-2.5 h-2.5 rounded-full shrink-0"
               :style="{ backgroundColor: selectedTag.color || '#22c55e' }"
             />
-            <span class="text-white font-medium truncate">{{ selectedTag.name }}</span>
+            <span class="text-sm text-white font-medium truncate">{{ selectedTag.name }}</span>
           </template>
           <template v-else>
             <PhTag :size="16" class="text-white/50 shrink-0" />
-            <span class="text-white/50">{{ placeholder }}</span>
+            <span class="text-sm text-white/50">{{ placeholder }}</span>
           </template>
         </div>
 
@@ -219,7 +219,7 @@ const handleKeydown = (e: KeyboardEvent) => {
             v-if="clearable && selectedTag && !disabled"
             role="button"
             aria-label="Remover categoria"
-            class="p-1.5 text-white/50 hover:text-rose-400 transition-colors cursor-pointer rounded"
+            class="p-1 text-white/50 hover:text-rose-400 transition-colors cursor-pointer rounded"
             title="Remover categoria"
             @click="clearCategory"
           >

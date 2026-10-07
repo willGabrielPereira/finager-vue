@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch, computed, markRaw } from 'vue'
+import { onMounted, ref, watch, computed, markRaw } from 'vue'
 import { useTransactionsStore } from '../stores/transactions'
 import { useAuthStore } from '../stores/auth'
 import AppSelect from '../components/ui/AppSelect.vue'
+import DateRangePicker from '../components/ui/date-picker/DateRangePicker.vue'
 import { useTagsStore } from '../stores/tags'
 import { useAccountsStore } from '../stores/accounts'
 import { TagCombobox } from '@/components/ui/tag-combobox'
@@ -18,9 +19,6 @@ import {
   PhArrowDownRight, 
   PhArrowUpRight, 
   PhCalendarBlank, 
-  PhCaretDown,
-  PhCaretLeft,
-  PhCaretRight, 
   PhPlus, 
   PhCircleNotch, 
   PhSparkle, 
@@ -30,7 +28,6 @@ import {
   PhBank, 
   PhCreditCard, 
   PhX, 
-  PhCheck, 
   PhArrowsCounterClockwise,
   PhPencilSimple,
   PhFunnel,
@@ -89,65 +86,25 @@ const similarPrompt = ref<{
 
 // Filtros
 const searchInput = ref('')
-const activeFilterTab = ref<'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED'>('ALL')
+const typeFilter = ref<'ALL' | 'DEBIT' | 'CREDIT'>('ALL')
+const statusFilter = ref<'ALL' | 'PLANNED'>('ALL')
 
-// Controle de rolagem horizontal das abas de filtro com setas, wheel e affordance visual
-const chipsContainer = ref<HTMLElement | null>(null)
-const canScrollLeft = ref(false)
-const canScrollRight = ref(false)
+// "Sem categoria" vive no select de categorias; exclusivo com categorias reais (backend: status=UNTAGGED)
+const UNTAGGED = '__untagged__'
+const categorySel = ref<string[]>([])
+const isUntagged = computed(() => categorySel.value.includes(UNTAGGED))
 
-const updateChipsScroll = () => {
-  const el = chipsContainer.value
-  if (!el) return
-  canScrollLeft.value = el.scrollLeft > 4
-  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 4
-}
-
-const scrollChips = (direction: 'left' | 'right') => {
-  const el = chipsContainer.value
-  if (!el) return
-  const offset = direction === 'left' ? -180 : 180
-  el.scrollBy({ left: offset, behavior: 'smooth' })
-}
-
-const handleChipsWheel = (e: WheelEvent) => {
-  if (!chipsContainer.value) return
-  if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-    chipsContainer.value.scrollLeft += e.deltaY
-    updateChipsScroll()
-  }
-}
-
-watch(activeFilterTab, () => {
-  setTimeout(updateChipsScroll, 60)
-})
-
-// Dropdowns de Filtro Avançado
-const isAccountsMenuOpen = ref(false)
-const isTagsMenuOpen = ref(false)
-const isPeriodMenuOpen = ref(false)
-const tagSearchQuery = ref('')
-
-type PeriodPreset = 'ALL' | 'PREVIOUS_MONTH' | 'CURRENT_MONTH' | 'LAST_30' | 'CURRENT_YEAR' | 'CUSTOM'
-const activePeriodPreset = ref<PeriodPreset>('ALL')
-const customDateFrom = ref('')
-const customDateTo = ref('')
-
-const periodLabels: Record<PeriodPreset, string> = {
-  ALL: 'Todo o histórico',
-  PREVIOUS_MONTH: 'Mês anterior',
-  CURRENT_MONTH: 'Mês atual',
-  LAST_30: 'Últimos 30 dias',
-  CURRENT_YEAR: 'Este ano',
-  CUSTOM: 'Personalizado',
-}
+const typeOptions = [
+  { value: 'ALL', label: 'Todos os tipos' },
+  { value: 'DEBIT', label: 'Despesas' },
+  { value: 'CREDIT', label: 'Receitas' },
+]
+const statusOptions = [
+  { value: 'ALL', label: 'Todas as situações' },
+  { value: 'PLANNED', label: 'Previstas' },
+]
 
 onMounted(async () => {
-  setTimeout(updateChipsScroll, 100)
-  if (chipsContainer.value) {
-    const observer = new ResizeObserver(updateChipsScroll)
-    observer.observe(chipsContainer.value)
-  }
   if (!authStore.isAuthenticated) return
   await Promise.all([
     store.fetchTransactions(),
@@ -155,26 +112,7 @@ onMounted(async () => {
     tagsStore.fetchFrequentTags(60, 6),
     accountsStore.fetchAccounts()
   ])
-  window.addEventListener('click', onWindowClick)
-  window.addEventListener('scroll', onWindowScroll, true)
 })
-
-onUnmounted(() => {
-  window.removeEventListener('click', onWindowClick)
-  window.removeEventListener('scroll', onWindowScroll, true)
-})
-
-const onWindowClick = () => {
-  isAccountsMenuOpen.value = false
-  isTagsMenuOpen.value = false
-  isPeriodMenuOpen.value = false
-}
-
-const onWindowScroll = () => {
-  isAccountsMenuOpen.value = false
-  isTagsMenuOpen.value = false
-  isPeriodMenuOpen.value = false
-}
 
 // Busca com debounce
 let searchTimeout: any = null
@@ -187,45 +125,22 @@ watch(searchInput, (newVal) => {
   }, 350)
 })
 
-const setFilterTab = (tab: 'ALL' | 'UNTAGGED' | 'DEBIT' | 'CREDIT' | 'PLANNED') => {
-  activeFilterTab.value = tab
+const applyTypeStatus = () => {
+  store.filters.type = ''
+  store.filters.amount_min = typeFilter.value === 'CREDIT' ? 0.01 : undefined
+  store.filters.amount_max = typeFilter.value === 'DEBIT' ? -0.01 : undefined
+  store.filters.status = isUntagged.value ? 'UNTAGGED' : statusFilter.value === 'ALL' ? '' : statusFilter.value
   store.pagination.page = 1
-
-  if (tab === 'ALL') {
-    store.filters.type = ''
-    store.filters.amount_min = undefined
-    store.filters.amount_max = undefined
-    store.filters.status = ''
-  } else if (tab === 'DEBIT') {
-    store.filters.type = ''
-    store.filters.amount_min = undefined
-    store.filters.amount_max = -0.01
-    store.filters.status = ''
-  } else if (tab === 'CREDIT') {
-    store.filters.type = ''
-    store.filters.amount_min = 0.01
-    store.filters.amount_max = undefined
-    store.filters.status = ''
-  } else if (tab === 'UNTAGGED') {
-    store.filters.type = ''
-    store.filters.amount_min = undefined
-    store.filters.amount_max = undefined
-    store.filters.status = 'UNTAGGED'
-  } else if (tab === 'PLANNED') {
-    store.filters.type = ''
-    store.filters.amount_min = undefined
-    store.filters.amount_max = undefined
-    store.filters.status = 'PLANNED'
-  }
-
   store.fetchTransactions()
 }
 
-// Filtros avançados (contas, categorias, período) ficam recolhidos no mobile
+// Filtros (tipo, situação, contas, categorias, período) ficam recolhidos no mobile
 const showAdvancedFilters = ref(false)
 const advancedFilterCount = computed(() =>
+  (typeFilter.value !== 'ALL' ? 1 : 0) +
+  (statusFilter.value !== 'ALL' ? 1 : 0) +
   store.filters.accounts.length +
-  store.filters.tags.length +
+  categorySel.value.length +
   (store.filters.date_from || store.filters.date_to ? 1 : 0)
 )
 
@@ -267,66 +182,36 @@ const accountFilterOptions = computed(() => {
 
 
 const toggleTagFilter = (tagId: string) => {
-  store.filters.tags = store.filters.tags.filter(id => id !== tagId);
+  categorySel.value = categorySel.value.filter(id => id !== tagId);
+  store.filters.tags = categorySel.value;
   store.pagination.page = 1;
   store.fetchTransactions();
 };
 
+const onCategoryChange = (val: string[]) => {
+  const next = val.includes(UNTAGGED) && val[val.length - 1] !== UNTAGGED ? val.filter(v => v !== UNTAGGED) : val
+  categorySel.value = next.includes(UNTAGGED) ? [UNTAGGED] : next
+  store.filters.tags = categorySel.value.filter(v => v !== UNTAGGED)
+  applyTypeStatus()
+}
+
+const clearUntagged = () => {
+  categorySel.value = []
+  applyTypeStatus()
+}
+
 const tagFilterOptions = computed(() => {
-  return tagsStore.tags.map((t) => ({
+  return [{ value: UNTAGGED, label: 'Sem categoria', color: '#f59e0b' }, ...tagsStore.tags.map((t) => ({
     value: t.id,
     label: t.name,
     color: t.color,
-  }))
+  }))]
 })
 
 // Filtro de Período
-const setPeriodPreset = (preset: PeriodPreset) => {
-  activePeriodPreset.value = preset
-  const now = new Date()
-
-  if (preset === 'ALL') {
-    store.filters.date_from = ''
-    store.filters.date_to = ''
-    isPeriodMenuOpen.value = false
-  } else if (preset === 'CURRENT_MONTH') {
-    const y = now.getFullYear()
-    const m = now.getMonth()
-    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
-    const lastDay = new Date(y, m + 1, 0).getDate()
-    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-    isPeriodMenuOpen.value = false
-  } else if (preset === 'PREVIOUS_MONTH') {
-    const prevDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    const y = prevDate.getFullYear()
-    const m = prevDate.getMonth()
-    store.filters.date_from = `${y}-${String(m + 1).padStart(2, '0')}-01`
-    const lastDay = new Date(y, m + 1, 0).getDate()
-    store.filters.date_to = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-    isPeriodMenuOpen.value = false
-  } else if (preset === 'LAST_30') {
-    const d30 = new Date()
-    d30.setDate(now.getDate() - 30)
-    store.filters.date_from = d30.toISOString().split('T')[0]
-    store.filters.date_to = now.toISOString().split('T')[0]
-    isPeriodMenuOpen.value = false
-  } else if (preset === 'CURRENT_YEAR') {
-    const y = now.getFullYear()
-    store.filters.date_from = `${y}-01-01`
-    store.filters.date_to = `${y}-12-31`
-    isPeriodMenuOpen.value = false
-  } else if (preset === 'CUSTOM') {
-    return
-  }
-
-  store.pagination.page = 1
-  store.fetchTransactions()
-}
-
-const applyCustomDates = () => {
-  store.filters.date_from = customDateFrom.value
-  store.filters.date_to = customDateTo.value
-  isPeriodMenuOpen.value = false
+const onPeriodChange = ({ from, to }: { from: string; to: string }) => {
+  store.filters.date_from = from
+  store.filters.date_to = to
   store.pagination.page = 1
   store.fetchTransactions()
 }
@@ -335,10 +220,10 @@ const applyCustomDates = () => {
 const hasActiveFilters = computed(() => {
   return (
     searchInput.value !== '' ||
-    activeFilterTab.value !== 'ALL' ||
+    typeFilter.value !== 'ALL' ||
+    statusFilter.value !== 'ALL' ||
     store.filters.accounts.length > 0 ||
-    store.filters.tags.length > 0 ||
-    activePeriodPreset.value !== 'ALL' ||
+    categorySel.value.length > 0 ||
     Boolean(store.filters.date_from) ||
     Boolean(store.filters.date_to)
   )
@@ -346,12 +231,10 @@ const hasActiveFilters = computed(() => {
 
 const resetAllFilters = () => {
   store.clearFilters()
-  activeFilterTab.value = 'ALL'
+  typeFilter.value = 'ALL'
+  statusFilter.value = 'ALL'
   searchInput.value = ''
-  activePeriodPreset.value = 'ALL'
-  customDateFrom.value = ''
-  customDateTo.value = ''
-  tagSearchQuery.value = ''
+  categorySel.value = []
   store.fetchTransactions()
 }
 
@@ -526,96 +409,10 @@ const isCredit = (t: Transaction) => {
 
     <!-- Bloco de Filtros Principal -->
     <div class="bg-surface rounded-2xl border border-white/5 p-3.5 flex flex-col gap-3 shadow-lg">
-      <!-- Linha 1: Abas Rápidas e Busca -->
-      <div class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-        <!-- Container dos Chips com Indicadores Visuais de Scroll e Setas -->
-        <div class="relative flex items-center min-w-0 flex-1">
-          <!-- Seta Esquerda -->
-          <button 
-            v-if="canScrollLeft"
-            type="button"
-            @click="scrollChips('left')"
-            class="absolute left-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0"
-            title="Ver opções anteriores"
-          >
-            <PhCaretLeft :size="13" weight="bold" />
-          </button>
-
-          <!-- Fade Gradiente Esquerdo -->
-          <div 
-            v-if="canScrollLeft"
-            class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-surface via-surface/80 to-transparent pointer-events-none z-10"
-          ></div>
-
-          <!-- Container Rolável de Chips com Scrollbar Estilizada -->
-          <div 
-            ref="chipsContainer"
-            @scroll="updateChipsScroll"
-            @wheel.passive="handleChipsWheel"
-            class="flex items-center gap-1.5 overflow-x-auto scroll-smooth custom-h-scrollbar pb-2 pt-0.5 px-2 min-w-0 w-full"
-          >
-            <button
-              type="button"
-              @click="setFilterTab('ALL')"
-              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
-              :class="activeFilterTab === 'ALL' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Todas
-            </button>
-            <button
-              type="button"
-              @click="setFilterTab('DEBIT')"
-              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
-              :class="activeFilterTab === 'DEBIT' ? 'bg-red-500/20 text-red-400 border border-red-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Despesas
-            </button>
-            <button
-              type="button"
-              @click="setFilterTab('CREDIT')"
-              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
-              :class="activeFilterTab === 'CREDIT' ? 'bg-accent/20 text-accent border border-accent/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Receitas
-            </button>
-            <button
-              type="button"
-              @click="setFilterTab('UNTAGGED')"
-              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
-              :class="activeFilterTab === 'UNTAGGED' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Sem Categoria
-            </button>
-            <button
-              type="button"
-              @click="setFilterTab('PLANNED')"
-              class="px-3 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0"
-              :class="activeFilterTab === 'PLANNED' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40' : 'text-white/60 hover:text-white hover:bg-white/5'"
-            >
-              Previstas
-            </button>
-          </div>
-
-          <!-- Fade Gradiente Direito (indica claramente que há mais opções à direita) -->
-          <div 
-            v-if="canScrollRight"
-            class="absolute right-0 top-0 bottom-0 w-12 bg-gradient-to-l from-surface via-surface/80 to-transparent pointer-events-none z-10"
-          ></div>
-
-          <!-- Seta Direita com Pulsar Sutil (Affordance interativa de mais opções) -->
-          <button 
-            v-if="canScrollRight"
-            type="button"
-            @click="scrollChips('right')"
-            class="absolute right-0 z-20 p-1.5 rounded-full bg-slate-900/95 border border-white/20 text-white/80 hover:text-white hover:border-accent hover:bg-slate-800 shadow-xl transition-all cursor-pointer flex items-center justify-center shrink-0 animate-pulse hover:animate-none motion-reduce:animate-none"
-            title="Mais opções à direita"
-          >
-            <PhCaretRight :size="13" weight="bold" />
-          </button>
-        </div>
-
+      <!-- Linha 1: Busca -->
+      <div class="flex items-center gap-3">
         <!-- Campo de Busca + botão de filtros (mobile) -->
-        <div class="flex items-center gap-2 w-full md:w-72 shrink-0">
+        <div class="flex items-center gap-2 w-full md:w-96">
           <div class="relative flex-1 min-w-0">
             <PhMagnifyingGlass :size="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-white/50" />
             <input
@@ -648,11 +445,18 @@ const isCredit = (t: Transaction) => {
         </div>
       </div>
 
-      <!-- Linha 2: Dropdowns de Filtros Avançados (Contas, Categorias, Período, Limpar) -->
+      <!-- Linha 2: Filtros (Tipo, Situação, Contas, Categorias, Período, Limpar) -->
       <div
         class="items-center gap-2 flex-wrap pt-1 border-t border-white/5"
         :class="showAdvancedFilters ? 'flex' : 'hidden md:flex'"
       >
+        <div class="w-full sm:w-44 shrink-0">
+          <AppSelect v-model="typeFilter" :options="typeOptions" size="sm" @change="applyTypeStatus" />
+        </div>
+        <div class="w-full sm:w-48 shrink-0">
+          <AppSelect v-model="statusFilter" :options="statusOptions" size="sm" @change="applyTypeStatus" />
+        </div>
+
         <!-- 1. Dropdown Multi-Contas com AppSelect -->
         <div class="w-full sm:w-56 shrink-0">
           <AppSelect
@@ -668,94 +472,17 @@ const isCredit = (t: Transaction) => {
         <!-- 2. Dropdown Multi-Categorias com AppSelect -->
         <div class="w-full sm:w-56 shrink-0">
           <AppSelect
-            v-model="store.filters.tags"
+            :model-value="categorySel"
             :options="tagFilterOptions"
             mode="multiple"
             placeholder="Todas as Categorias"
             size="sm"
-            @change="onFilterSelectChange"
+            @change="onCategoryChange"
           />
         </div>
 
-        <!-- 3. Dropdown de Período -->
-        <div class="relative">
-          <button
-            type="button"
-            @click.stop="isPeriodMenuOpen = !isPeriodMenuOpen; isAccountsMenuOpen = false; isTagsMenuOpen = false"
-            class="flex items-center gap-2 px-3 h-9 rounded-xl text-xs font-medium border transition-all cursor-pointer whitespace-nowrap shrink-0"
-            :class="activePeriodPreset !== 'ALL' || store.filters.date_from 
-              ? 'bg-accent/15 border-accent/50 text-accent' 
-              : 'bg-white/5 border-white/10 text-white/70 hover:bg-white/10'"
-          >
-            <PhCalendarBlank :size="15" />
-            <span>{{ periodLabels[activePeriodPreset] }}</span>
-            <PhCaretDown :size="12" class="opacity-60" />
-          </button>
-
-          <!-- Menu Flutuante de Período -->
-          <div 
-            v-if="isPeriodMenuOpen" 
-            @click.stop
-            class="absolute left-0 top-full mt-2 w-72 p-3 bg-surface border border-white/10 rounded-2xl shadow-2xl z-50 flex flex-col gap-2 backdrop-blur-md"
-          >
-            <div class="text-xs font-bold text-white pb-1.5 border-b border-white/5">
-              Selecione o Período
-            </div>
-
-            <div class="grid grid-cols-1 gap-1">
-              <button
-                v-for="preset in (['PREVIOUS_MONTH', 'CURRENT_MONTH', 'LAST_30', 'CURRENT_YEAR', 'ALL'] as PeriodPreset[])"
-                :key="preset"
-                type="button"
-                @click="setPeriodPreset(preset)"
-                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
-                :class="activePeriodPreset === preset ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
-              >
-                <span>{{ periodLabels[preset] }}</span>
-                <PhCheck v-if="activePeriodPreset === preset" :size="14" weight="bold" />
-              </button>
-
-              <button
-                type="button"
-                @click="activePeriodPreset = 'CUSTOM'"
-                class="w-full text-left px-3 py-2 rounded-xl text-xs transition-colors flex items-center justify-between cursor-pointer"
-                :class="activePeriodPreset === 'CUSTOM' ? 'bg-accent/20 text-accent font-semibold' : 'text-white/70 hover:bg-white/5 hover:text-white'"
-              >
-                <span>Personalizado</span>
-                <PhCheck v-if="activePeriodPreset === 'CUSTOM'" :size="14" weight="bold" />
-              </button>
-            </div>
-
-            <!-- Campos de Data Personalizada -->
-            <div v-if="activePeriodPreset === 'CUSTOM'" class="mt-2 pt-2 border-t border-white/5 flex flex-col gap-2">
-              <div class="flex items-center gap-2">
-                <div class="flex-1">
-                  <label class="text-[10px] text-white/50 block mb-1">De:</label>
-                  <input
-                    v-model="customDateFrom"
-                    type="date"
-                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-base md:text-xs text-white focus:outline-none focus:border-accent"
-                  />
-                </div>
-                <div class="flex-1">
-                  <label class="text-[10px] text-white/50 block mb-1">Até:</label>
-                  <input
-                    v-model="customDateTo"
-                    type="date"
-                    class="w-full bg-slate-950/70 border border-white/10 rounded-lg px-2 py-1 text-base md:text-xs text-white focus:outline-none focus:border-accent"
-                  />
-                </div>
-              </div>
-              <button
-                type="button"
-                @click="applyCustomDates"
-                class="w-full py-1.5 bg-accent text-bg font-bold rounded-lg text-xs hover:opacity-90 transition-opacity cursor-pointer mt-1"
-              >
-                Aplicar Datas
-              </button>
-            </div>
-          </div>
-        </div>
+        <!-- 3. Período -->
+        <DateRangePicker :from="store.filters.date_from" :to="store.filters.date_to" @change="onPeriodChange" />
 
         <!-- 4. Botão Limpar Filtros -->
         <button
@@ -792,6 +519,14 @@ const isCredit = (t: Transaction) => {
           <button @click="toggleAccountFilter(accId)" aria-label="Remover filtro de conta" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
 
+        <span
+          v-if="isUntagged"
+          class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400"
+        >
+          Sem categoria
+          <button @click="clearUntagged" aria-label="Remover filtro sem categoria" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+        </span>
+
         <!-- Badges de Categorias Selecionadas -->
         <span 
           v-for="tagId in store.filters.tags" 
@@ -809,7 +544,7 @@ const isCredit = (t: Transaction) => {
           class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-300"
         >
           Período: {{ formatDate(store.filters.date_from) }} - {{ formatDate(store.filters.date_to) }}
-          <button @click="setPeriodPreset('ALL')" aria-label="Remover filtro de período" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
+          <button @click="onPeriodChange({ from: '', to: '' })" aria-label="Remover filtro de período" class="p-1 -m-1 hover:text-rose-400 cursor-pointer"><PhX :size="12" /></button>
         </span>
       </div>
     </div>
