@@ -102,7 +102,7 @@ const onRange = (r: { start?: DateValue; end?: DateValue }) => {
       </button>
     </PopoverTrigger>
 
-    <PopoverContent align="start" :side-offset="6" class="w-auto p-0 rounded-2xl border-white/10 bg-surface shadow-2xl shadow-black/80">
+    <PopoverContent align="start" :side-offset="6" class="w-auto max-w-[calc(100vw-1rem)] p-0 rounded-2xl border-white/10 bg-surface shadow-2xl shadow-black/80">
       <div class="flex flex-col sm:flex-row">
         <div class="flex sm:flex-col gap-1 p-2 overflow-x-auto sm:overflow-visible border-b sm:border-b-0 sm:border-r border-white/10">
           <button

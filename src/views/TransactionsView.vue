@@ -29,6 +29,7 @@ import {
   PhCreditCard, 
   PhX, 
   PhArrowsCounterClockwise,
+  PhArrowsClockwise,
   PhPencilSimple,
   PhFunnel,
   PhWarningCircle
@@ -103,6 +104,25 @@ const statusOptions = [
   { value: 'ALL', label: 'Todas as situações' },
   { value: 'PLANNED', label: 'Previstas' },
 ]
+
+// Persiste filtros no navegador (restaura antes do watch da busca e do primeiro fetch)
+const FILTERS_KEY = 'finager:transactions-filters'
+try {
+  const saved = JSON.parse(localStorage.getItem(FILTERS_KEY) || 'null')
+  if (saved) {
+    Object.assign(store.filters, saved.filters)
+    typeFilter.value = saved.typeFilter ?? 'ALL'
+    statusFilter.value = saved.statusFilter ?? 'ALL'
+    categorySel.value = saved.categorySel ?? []
+    searchInput.value = saved.searchInput ?? ''
+  }
+} catch { /* ignora JSON inválido/storage indisponível */ }
+
+watch(
+  () => ({ filters: store.filters, typeFilter: typeFilter.value, statusFilter: statusFilter.value, categorySel: categorySel.value, searchInput: searchInput.value }),
+  (v) => { try { localStorage.setItem(FILTERS_KEY, JSON.stringify(v)) } catch { /* noop */ } },
+  { deep: true },
+)
 
 onMounted(async () => {
   if (!authStore.isAuthenticated) return
@@ -353,7 +373,7 @@ const handleDelete = async (txId: string) => {
 const formatDate = (dateString: string) => {
   if (!dateString) return ''
   const d = new Date(dateString)
-  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' })
 }
 
 const formatCurrency = (val: number) => {
@@ -441,6 +461,16 @@ const isCredit = (t: Transaction) => {
           >
             <PhFunnel :size="16" />
             <span>Filtros{{ advancedFilterCount > 0 ? ` (${advancedFilterCount})` : '' }}</span>
+          </button>
+          <button
+            type="button"
+            @click="store.fetchTransactions()"
+            :disabled="store.loading"
+            aria-label="Atualizar lista"
+            title="Atualizar lista"
+            class="flex items-center justify-center w-10 h-10 rounded-xl border bg-white/5 border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+          >
+            <PhArrowsClockwise :size="16" :class="{ 'animate-spin': store.loading }" />
           </button>
         </div>
       </div>

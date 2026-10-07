@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
@@ -11,6 +12,25 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
+      VitePWA({
+        // autoUpdate: SW novo assume sozinho no próximo load. Só precacheia o app shell;
+        // chamadas à API (outra origem) nunca passam pelo cache.
+        registerType: 'autoUpdate',
+        manifest: {
+          name: 'Finager - Gestão Financeira Familiar',
+          short_name: 'Finager',
+          lang: 'pt-BR',
+          start_url: '/',
+          display: 'standalone',
+          background_color: '#020617',
+          theme_color: '#020617',
+          icons: [
+            { src: 'pwa-192.png', sizes: '192x192', type: 'image/png' },
+            { src: 'pwa-512.png', sizes: '512x512', type: 'image/png' },
+            { src: 'pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          ],
+        },
+      }),
       {
         // CSP via <meta>, só no build de produção: ainda não há servidor/proxy definido
         // para entregar como header HTTP, e via header seria mais forte (dá pra usar
