@@ -16,6 +16,9 @@ export default defineConfig(({ mode }) => {
         // autoUpdate: SW novo assume sozinho no próximo load. Só precacheia o app shell;
         // chamadas à API (outra origem) nunca passam pelo cache.
         registerType: 'autoUpdate',
+        // mode 'development' pula o terser do workbox, que morre no Termux/Android
+        // ("Unexpected early exit ... (terser) renderChunk"). SW fica sem minificar (~poucos KB).
+        workbox: { mode: 'development' },
         manifest: {
           name: 'Finager - Gestão Financeira Familiar',
           short_name: 'Finager',
