@@ -144,8 +144,9 @@ const fmt = (d: string) => new Date(d).toLocaleDateString('pt-BR')
 
         <div v-for="(s, i) in sections" :key="`${editorKey}-${i}`" class="rounded-xl border border-white/10 p-3 flex flex-col gap-3">
           <div class="flex items-center gap-2">
-            <AppSelect v-model="s.tag" :options="tagOptions" class="w-44 shrink-0" />
-            <Input v-model="s.heading" placeholder="Título com emoji, ex.: 📥 Importação de CSV" />
+            <!-- wrapper: o AppSelect já tem w-full na raiz e ignoraria um w-44 vindo de fora -->
+            <div class="w-44 shrink-0"><AppSelect v-model="s.tag" :options="tagOptions" /></div>
+            <Input v-model="s.heading" class="min-w-0 flex-1" placeholder="Título com emoji, ex.: 📥 Importação de CSV" />
             <Button variant="destructive" size="icon" aria-label="Remover seção" @click="sections.splice(i, 1)"><PhTrash :size="16" /></Button>
           </div>
           <MarkdownEditor v-model="s.body" />
