@@ -7,7 +7,9 @@ import BottomNav from './BottomNav.vue'
 import CreateTransactionModal from '../ui/CreateTransactionModal.vue'
 import ImportOFXModal from '../ui/ImportOFXModal.vue'
 import OFXGuideModal from '../ui/OFXGuideModal.vue'
-import { PhPlus, PhUploadSimple, PhBank, PhX, PhFileText, PhSparkle, PhUser, PhListChecks, PhCrown, PhSignOut, PhCaretRight, PhShieldCheck } from '@phosphor-icons/vue'
+import ChangelogModal from '../ChangelogModal.vue'
+import { useChangelogStore } from '../../stores/changelog'
+import { PhPlus, PhUploadSimple, PhBank, PhX, PhFileText, PhSparkle, PhUser, PhListChecks, PhCrown, PhSignOut, PhCaretRight, PhShieldCheck, PhMegaphone } from '@phosphor-icons/vue'
 import { useEscapeKey } from '../../composables/useEscapeKey'
 import { useTransactionsStore } from '../../stores/transactions'
 import { useAuthStore } from '../../stores/auth'
@@ -16,6 +18,31 @@ import { startInteractiveTour } from '../../utils/tour'
 const router = useRouter()
 const txStore = useTransactionsStore()
 const authStore = useAuthStore()
+const changelogStore = useChangelogStore()
+
+const isChangelogOpen = ref(false)
+const changelogShowAll = ref(false)
+const changelogEntries = computed(() => changelogShowAll.value ? changelogStore.entries : changelogStore.entries.slice(0, 1))
+const openChangelog = () => {
+  isMobileMoreSheetOpen.value = false
+  changelogShowAll.value = true
+  isChangelogOpen.value = true
+}
+const closeChangelog = () => {
+  isChangelogOpen.value = false
+  if (changelogStore.unseen) changelogStore.markSeen()
+}
+const loadChangelog = async () => {
+  try {
+    await changelogStore.fetch()
+  } catch {
+    return
+  }
+  if (changelogStore.unseen && changelogStore.entries.length) {
+    changelogShowAll.value = false
+    isChangelogOpen.value = true
+  }
+}
 
 const isCreateTxModalOpen = ref(false)
 const isImportModalOpen = ref(false)
@@ -82,6 +109,7 @@ const triggerTour = () => {
 
 // Provide global para componentes filhos abrirem de qualquer lugar
 provide('openOFXGuide', openOFXGuide)
+provide('openChangelog', openChangelog)
 provide('openTour', () => triggerTour())
 provide('openCreateTx', openCreateTx)
 provide('openImport', openImport)
@@ -104,6 +132,7 @@ onMounted(async () => {
     await authStore.fetchMe()
   }
   checkFirstTimeTour()
+  if (authStore.isAuthenticated) loadChangelog()
 })
 
 watch(() => authStore.user, (user) => {
@@ -129,6 +158,7 @@ const onOFXImported = () => {
       @import-ofx="openImport"
       @open-ofx-guide="openOFXGuide()"
       @open-tour="triggerTour()"
+      @open-changelog="openChangelog()"
     />
 
     <!-- Main Content Area -->
@@ -258,6 +288,14 @@ const onOFXImported = () => {
           </button>
           <button
             type="button"
+            @click="openChangelog()"
+            class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white text-xs transition-colors cursor-pointer text-left"
+          >
+            <PhMegaphone :size="18" class="text-accent" />
+            <span>Novidades</span>
+          </button>
+          <button
+            type="button"
             @click="triggerTour()"
             class="flex items-center gap-3 p-3 rounded-xl hover:bg-white/5 text-white/70 hover:text-white text-xs transition-colors cursor-pointer text-left"
           >
@@ -288,6 +326,8 @@ const onOFXImported = () => {
       @close="isImportModalOpen = false"
       @imported="onOFXImported"
     />
+
+    <ChangelogModal :open="isChangelogOpen" :entries="changelogEntries" @close="closeChangelog" />
 
     <OFXGuideModal
       :is-open="isOFXGuideOpen"

@@ -21,6 +21,7 @@ const router = createRouter({
     { path: '/billing', component: () => import('../views/BillingView.vue') },
     { path: '/tag-rules', component: () => import('../views/TagRulesView.vue') },
     { path: '/admin', component: () => import('../views/AdminDashboardView.vue'), meta: { roles: ['admin', 'moderator'], layout: 'admin' } },
+    { path: '/admin/changelog', component: () => import('../views/AdminChangelogView.vue'), meta: { roles: ['admin'], layout: 'admin' } },
     { path: '/admin/reauth', component: () => import('../views/AdminReauthView.vue'), meta: { roles: ['admin', 'moderator'], layout: 'admin' } },
     { path: '/:pathMatch(.*)*', redirect: '/' }
   ]

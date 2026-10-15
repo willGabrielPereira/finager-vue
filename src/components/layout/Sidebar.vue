@@ -11,6 +11,7 @@ import {
   PhWallet,
   PhFileText,
   PhSparkle,
+  PhMegaphone,
   PhCrown,
   PhLightning,
   PhListChecks,
@@ -25,6 +26,7 @@ defineEmits<{
   (e: 'import-ofx'): void
   (e: 'open-ofx-guide'): void
   (e: 'open-tour'): void
+  (e: 'open-changelog'): void
 }>()
 
 const route = useRoute()
@@ -182,6 +184,16 @@ const navItems = computed(() => [
       >
         <PhSparkle :size="16" class="text-amber-400" />
         <span>Tour de Boas-Vindas</span>
+      </button>
+
+      <button
+        type="button"
+        @click="$emit('open-changelog')"
+        class="flex items-center gap-3 px-3.5 py-2 rounded-xl text-xs text-white/50 hover:text-white hover:bg-white/5 transition-all cursor-pointer font-medium text-left"
+        title="Ver as últimas novidades do Finager"
+      >
+        <PhMegaphone :size="16" class="text-accent" />
+        <span>Novidades</span>
       </button>
     </div>
   </aside>

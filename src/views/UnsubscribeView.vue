@@ -12,6 +12,8 @@ const auth = useAuthStore();
 
 const u = String(route.query.u || '');
 const s = String(route.query.s || '');
+const kind = route.query.kind ? String(route.query.kind) : undefined;
+const isChangelog = kind === 'changelog';
 
 const loading = ref(false);
 const done = ref(false);
@@ -21,7 +23,7 @@ const handleUnsubscribe = async () => {
   loading.value = true;
   errorMsg.value = '';
   try {
-    await auth.unsubscribeEmail(u, s);
+    await auth.unsubscribeEmail(u, s, kind);
     done.value = true;
   } catch (err: any) {
     errorMsg.value = unwrapApiError(err, 'Link inválido ou expirado.');
@@ -40,16 +42,16 @@ const handleUnsubscribe = async () => {
         </div>
       </div>
 
-      <h1 class="text-2xl font-bold mb-1.5 text-center text-white tracking-tight">Lembretes por E-mail</h1>
+      <h1 class="text-2xl font-bold mb-1.5 text-center text-white tracking-tight">{{ isChangelog ? 'Novidades por E-mail' : 'Lembretes por E-mail' }}</h1>
 
       <div v-if="done" class="p-4 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs rounded-xl flex items-center gap-2 text-center justify-center">
         <PhCheckCircle :size="18" />
-        <span>Você não receberá mais lembretes por e-mail.</span>
+        <span>{{ isChangelog ? 'Você não receberá mais novidades por e-mail.' : 'Você não receberá mais lembretes por e-mail.' }}</span>
       </div>
 
       <template v-else-if="u && s">
         <p class="text-white/50 text-center mb-6 text-xs sm:text-sm">
-          Deseja parar de receber lembretes de importação (OFX) por e-mail?
+          {{ isChangelog ? 'Deseja parar de receber as novidades do Finager por e-mail?' : 'Deseja parar de receber lembretes de importação (OFX) por e-mail?' }}
         </p>
 
         <div v-if="errorMsg" role="alert" class="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl text-center">

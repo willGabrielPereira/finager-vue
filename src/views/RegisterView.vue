@@ -28,6 +28,7 @@ const familyName = ref('')
 const password = ref('')
 const confirmPassword = ref('')
 const inviteToken = ref('')
+const changelogOptIn = ref(false)
 const inviteFamilyName = ref('')
 const loading = ref(false)
 const validatingInvite = ref(false)
@@ -78,7 +79,8 @@ const handleRegister = async () => {
       data.email,
       data.password,
       inviteToken.value ? undefined : familyName.value.trim(),
-      inviteToken.value || undefined
+      inviteToken.value || undefined,
+      changelogOptIn.value
     )
     router.push(getRedirectTarget(route.query))
   } catch (err: any) {
@@ -195,6 +197,11 @@ const handleRegister = async () => {
           />
         </div>
         
+        <label class="flex items-start gap-2 text-xs text-white/70 cursor-pointer">
+          <input v-model="changelogOptIn" type="checkbox" class="mt-0.5 accent-[#22C55E]" />
+          <span>Quero receber novidades por e-mail</span>
+        </label>
+
         <div v-if="errorMsg" role="alert" class="p-3 bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs rounded-xl text-center">
           {{ errorMsg }}
         </div>

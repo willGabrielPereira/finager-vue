@@ -63,3 +63,20 @@ Estrutura de resposta padrão paginada:
 2. O `access_token` é enviado via `Authorization: Bearer <token>` em todas as rotas privadas.
 3. Se a API responder `401 Unauthorized`, o interceptor Axios em `src/api/axios.ts` chama `POST /auth/refresh` com payload `{ refresh_token }`.
 4. Os novos tokens são persistidos na `auth` store e a requisição original que havia falhado é reenviada automaticamente.
+
+---
+
+## 5. Novidades (Changelog)
+
+Entrada: `{ id, title, intro, sections: [{ tag, heading, body }], published_at (nullable), created_at }`. `intro` e `body` são markdown bruto (renderizado no front com `marked` + `DOMPurify`). `tag` ∈ `NOVIDADES | MELHORIAS | CORREÇÕES`.
+
+| Rota | Uso |
+| :--- | :--- |
+| `GET /changelog` | `{ entries, unseen }` — entradas publicadas; `unseen` abre o modal no `AppLayout` (`stores/changelog.ts`). |
+| `POST /me/changelog/seen` | 204 — chamado ao fechar o modal. |
+| `PATCH /me/preferences` | `{ email_changelog_opt_in }` → 204 (toggle no Perfil). `GET /me` devolve `email_changelog_opt_in`. |
+| `POST /auth/register` | aceita `email_changelog_opt_in` opcional (checkbox desmarcado por padrão). |
+| `GET /admin/changelog` | `{ entries }` incluindo rascunhos (role `admin`; view `AdminChangelogView.vue`, `stores/admin.ts`). |
+| `POST /admin/changelog` · `PUT /admin/changelog/{id}` | `{ title, intro, sections }` → entrada. |
+| `POST /admin/changelog/{id}/publish` | publica e dispara e-mail aos usuários com opt-in → entrada. |
+| `POST /email/unsubscribe` | `{ u, s, kind? }`; `kind: "changelog"` desliga só o e-mail de novidades (`UnsubscribeView` repassa `?kind=`). |

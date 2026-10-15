@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { api } from '../api/axios';
 import { toast } from '../utils/feedback';
+import type { ChangelogEntry, ChangelogSection } from './changelog';
 
 export interface AdminStatsOverview {
   total_users: number;
@@ -83,10 +84,32 @@ export const useAdminStore = defineStore('admin', {
     admins: [] as AdminUser[],
     invites: [] as AdminInvite[],
     coupons: [] as AdminCoupon[],
+    changelog: [] as ChangelogEntry[],
     loading: false,
   }),
 
   actions: {
+    async fetchChangelog() {
+      return withLoadingAndErrorToast(this, 'Erro ao buscar novidades', [], async () => {
+        const { data } = await api.get('/admin/changelog');
+        this.changelog = data.entries || [];
+        return this.changelog;
+      });
+    },
+
+    // Erros propagam: a view mostra o feedback.
+    async saveChangelog(id: string | null, payload: { title: string; intro: string; sections: ChangelogSection[] }) {
+      const { data } = id ? await api.put(`/admin/changelog/${id}`, payload) : await api.post('/admin/changelog', payload);
+      await this.fetchChangelog();
+      return data as ChangelogEntry;
+    },
+
+    async publishChangelog(id: string) {
+      const { data } = await api.post(`/admin/changelog/${id}/publish`);
+      await this.fetchChangelog();
+      return data as ChangelogEntry;
+    },
+
     async fetchStats() {
       return withLoadingAndErrorToast(this, 'Erro ao buscar estatísticas de admin', null, async () => {
         const { data } = await api.get('/admin/stats/overview');

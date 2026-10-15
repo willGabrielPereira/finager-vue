@@ -31,7 +31,8 @@ import {
   PhRocketLaunch, 
   PhShieldCheck,
   PhShareNetwork,
-  PhLifebuoy
+  PhLifebuoy,
+  PhMegaphone
 } from '@phosphor-icons/vue'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -81,6 +82,18 @@ const joinToken = ref('')
 const joinLoading = ref(false)
 const joinError = ref('')
 const joinSuccess = ref('')
+
+const changelogOptIn = computed(() => !!authStore.user?.email_changelog_opt_in)
+const toggleChangelogOptIn = async (e: Event) => {
+  const checked = (e.target as HTMLInputElement).checked
+  try {
+    await authStore.setChangelogOptIn(checked)
+    toast.success('Preferência salva', checked ? 'Você receberá as novidades por e-mail.' : 'Você não receberá mais novidades por e-mail.')
+  } catch (err: any) {
+    ;(e.target as HTMLInputElement).checked = !checked
+    toast.error('Erro', unwrapApiError(err, 'Não foi possível salvar a preferência.'))
+  }
+}
 
 const isDeleteModalOpen = ref(false)
 const openDeleteAccountModal = () => {
@@ -499,6 +512,18 @@ const formatDate = (dateStr?: string) => {
       </div>
       <p v-if="joinSuccess" class="text-xs text-emerald-400 mt-1">{{ joinSuccess }}</p>
       <p v-if="joinError" class="text-xs text-rose-400 mt-1">{{ joinError }}</p>
+    </Card>
+
+    <!-- Preferência: novidades por e-mail -->
+    <Card class="p-6 shadow-md flex items-center justify-between gap-4">
+      <label for="changelog-opt-in" class="flex items-center gap-3 cursor-pointer">
+        <PhMegaphone :size="20" class="text-accent shrink-0" weight="duotone" />
+        <div>
+          <div class="text-sm font-bold text-white">Receber novidades por e-mail</div>
+          <div class="text-xs text-white/50">Avisos sobre novos recursos do Finager.</div>
+        </div>
+      </label>
+      <input id="changelog-opt-in" type="checkbox" :checked="changelogOptIn" @change="toggleChangelogOptIn" class="w-5 h-5 accent-[#22C55E] cursor-pointer shrink-0" />
     </Card>
 
     <!-- Grid de Configurações -->

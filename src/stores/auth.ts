@@ -12,6 +12,7 @@ export interface UserProfile {
   subscription_status?: string;
   onboarding_completed?: boolean;
   onboarding_step?: number;
+  email_changelog_opt_in?: boolean;
   created_at?: string;
   role: 'user' | 'moderator' | 'admin';
 }
@@ -53,7 +54,7 @@ export const useAuthStore = defineStore('auth', {
       await this.fetchMe();
     },
 
-    async register(login: string, email: string, password: string, familyName?: string, inviteToken?: string) {
+    async register(login: string, email: string, password: string, familyName?: string, inviteToken?: string, emailChangelogOptIn?: boolean) {
       sessionStorage.removeItem('finager_tour_started');
       const payload: Record<string, any> = { login, email, password };
       if (familyName && familyName.trim().length > 0) {
@@ -61,6 +62,9 @@ export const useAuthStore = defineStore('auth', {
       }
       if (inviteToken && inviteToken.trim().length > 0) {
         payload.invite_token = inviteToken.trim();
+      }
+      if (emailChangelogOptIn) {
+        payload.email_changelog_opt_in = true;
       }
       const { data } = await api.post('/auth/register', payload);
       this.setTokens(data.access_token, data.refresh_token);
@@ -139,6 +143,11 @@ export const useAuthStore = defineStore('auth', {
       return data;
     },
 
+    async setChangelogOptIn(optIn: boolean) {
+      await api.patch('/me/preferences', { email_changelog_opt_in: optIn });
+      if (this.user) this.user.email_changelog_opt_in = optIn;
+    },
+
     async changePassword(currentPassword: string, newPassword: string) {
       await api.put('/auth/password', {
         current_password: currentPassword,
@@ -155,8 +164,8 @@ export const useAuthStore = defineStore('auth', {
       await api.post('/auth/password/reset', { token, new_password: newPassword });
     },
 
-    async unsubscribeEmail(u: string, s: string) {
-      await api.post('/email/unsubscribe', { u, s });
+    async unsubscribeEmail(u: string, s: string, kind?: string) {
+      await api.post('/email/unsubscribe', kind ? { u, s, kind } : { u, s });
     },
     
     async logout() {

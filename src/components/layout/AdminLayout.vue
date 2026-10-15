@@ -3,10 +3,12 @@
 // (sem Sidebar/Topbar/BottomNav) para deixar claro que é outro contexto.
 import { PhShieldCheck, PhSignOut } from '@phosphor-icons/vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../../stores/auth'
 import { useAdminAuthStore } from '../../stores/adminAuth'
 
 const router = useRouter()
 const adminAuthStore = useAdminAuthStore()
+const auth = useAuthStore()
 
 // Sair do painel apaga a elevação imediatamente — não deixa o token de 15min vivo
 // em memória enquanto o admin usa o app comum depois de "sair".
@@ -24,6 +26,11 @@ function sair() {
         <PhShieldCheck :size="20" weight="fill" />
         <span>Painel Administrativo</span>
       </div>
+
+      <nav class="flex items-center gap-4 ml-auto text-xs font-semibold">
+        <router-link to="/admin" class="text-white/60 hover:text-white transition-colors">Painel</router-link>
+        <router-link v-if="auth.isAdmin" to="/admin/changelog" class="text-white/60 hover:text-white transition-colors">Novidades</router-link>
+      </nav>
 
       <button
         type="button"
